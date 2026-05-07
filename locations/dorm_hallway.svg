@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800">
+  <defs>
+    <linearGradient id="bg-hallway" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#e2e8f0"/>
+      <stop offset="1" stop-color="#94a3b8"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="800" fill="url(#bg-hallway)"/>
+  <rect y="560" width="1280" height="240" fill="#cbd5e1"/>
+  <rect x="140" y="120" width="1000" height="520" rx="30" fill="#f8fafc"/>
+  <rect x="170" y="170" width="170" height="420" rx="20" fill="#cbd5e1"/>
+  <rect x="430" y="170" width="170" height="420" rx="20" fill="#e2e8f0"/>
+  <rect x="690" y="170" width="170" height="420" rx="20" fill="#cbd5e1"/>
+  <rect x="950" y="170" width="170" height="420" rx="20" fill="#e2e8f0"/>
+  <rect x="198" y="230" width="114" height="270" rx="18" fill="#94a3b8"/>
+  <rect x="458" y="230" width="114" height="270" rx="18" fill="#94a3b8"/>
+  <rect x="718" y="230" width="114" height="270" rx="18" fill="#94a3b8"/>
+  <rect x="978" y="230" width="114" height="270" rx="18" fill="#94a3b8"/>
+  <path d="M170 650h940" stroke="#94a3b8" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="640" cy="220" r="34" fill="#f59e0b" opacity="0.22"/>
+</svg>

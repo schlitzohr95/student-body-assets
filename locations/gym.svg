@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800">
+  <defs>
+    <linearGradient id="bg-gym" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#cbd5e1"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="800" fill="url(#bg-gym)"/>
+  <rect y="560" width="1280" height="240" fill="#94a3b8"/>
+  <rect x="90" y="120" width="1100" height="360" rx="28" fill="#ffffff"/>
+  <rect x="180" y="210" width="180" height="180" rx="90" fill="#0ea5e9" opacity="0.2"/>
+  <circle cx="270" cy="300" r="56" fill="#f2c7a3"/>
+  <path d="M212 290c10-40 32-64 58-64s48 24 58 64v48H212z" fill="#111827"/>
+  <path d="M500 300h280" stroke="#64748b" stroke-width="28" stroke-linecap="round"/>
+  <path d="M500 300h-42" stroke="#64748b" stroke-width="18" stroke-linecap="round"/>
+  <path d="M780 300h42" stroke="#64748b" stroke-width="18" stroke-linecap="round"/>
+  <circle cx="900" cy="280" r="64" fill="#22c55e" opacity="0.16"/>
+  <path d="M900 240l16 34 34 16-34 16-16 34-16-34-34-16 34-16z" fill="#22c55e" opacity="0.8"/>
+  <rect x="160" y="500" width="960" height="50" rx="25" fill="#334155" opacity="0.24"/>
+  <rect x="240" y="140" width="800" height="30" rx="15" fill="#bfdbfe"/>
+</svg>

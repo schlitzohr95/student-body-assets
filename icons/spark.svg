@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <linearGradient id="spark-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ff4d6d"/>
+      <stop offset="1" stop-color="#ff9f1c"/>
+    </linearGradient>
+  </defs>
+  <rect width="256" height="256" rx="54" fill="url(#spark-bg)"/>
+  <circle cx="60" cy="64" r="22" fill="#ffffff" opacity="0.14"/>
+  <circle cx="196" cy="194" r="34" fill="#ffffff" opacity="0.12"/>
+  <path d="M77 101c0-11 9-20 20-20h42c11 0 20 9 20 20v19c0 11-9 20-20 20h-9l-12 12v-12H97c-11 0-20-9-20-20z" fill="#fff" opacity="0.95"/>
+  <path d="M87 111c0-5 4-9 9-9h35c5 0 9 4 9 9v12c0 5-4 9-9 9h-7v10l-10-10H96c-5 0-9-4-9-9z" fill="#ff8fa3" opacity="0.65"/>
+  <path d="M161 84c2 5 4 7 9 9-5 2-7 4-9 9-2-5-4-7-9-9 5-2 7-4 9-9z" fill="#fff"/>
+  <path d="M176 140c2 7 6 11 13 13-7 2-11 6-13 13-2-7-6-11-13-13 7-2 11-6 13-13z" fill="#fff" opacity="0.9"/>
+  <path d="M122 147c12 0 22-10 22-22 0-8-5-15-12-19-4-2-8-3-10-3s-6 1-10 3c-7 4-12 11-12 19 0 12 10 22 22 22z" fill="#fff"/>
+  <path d="M122 108c2 3 4 5 4 9 0 4-2 8-5 11-4-2-7-5-9-9 1-6 5-9 10-11z" fill="#ff8fa3"/>
+</svg>

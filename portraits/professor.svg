@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-professor" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#334155"/>
+      <stop offset="1" stop-color="#64748b"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg-professor)"/>
+  <circle cx="156" cy="138" r="40" fill="#ffffff" opacity="0.12"/>
+  <circle cx="356" cy="362" r="52" fill="#ffffff" opacity="0.12"/>
+  <circle cx="256" cy="194" r="88" fill="#f2c7a3"/>
+  <path d="M162 182c8-56 40-88 94-88s86 32 94 88v62H162z" fill="#2f2a4a"/>
+  <path d="M172 182c12-26 38-44 84-44s72 18 84 44" fill="none" stroke="#94a3b8" stroke-width="14" stroke-linecap="round"/>
+  <rect x="192" y="176" width="128" height="92" rx="20" fill="#ffffff" opacity="0.92"/>
+  <circle cx="232" cy="224" r="20" fill="none" stroke="#334155" stroke-width="8"/>
+  <circle cx="280" cy="224" r="20" fill="none" stroke="#334155" stroke-width="8"/>
+  <path d="M252 224h8" stroke="#334155" stroke-width="8" stroke-linecap="round"/>
+  <path d="M300 224h30" stroke="#334155" stroke-width="8" stroke-linecap="round"/>
+  <circle cx="228" cy="204" r="6" fill="#334155"/>
+  <circle cx="276" cy="204" r="6" fill="#334155"/>
+  <path d="M224 242c14 10 50 10 64 0" fill="none" stroke="#334155" stroke-width="8" stroke-linecap="round"/>
+  <path d="M210 292c-24 8-42 28-52 58l-24 104h244l-24-104c-10-30-28-50-52-58-16 10-32 16-36 16s-20-6-36-16z" fill="#f8fafc"/>
+  <path d="M256 302v118" stroke="#94a3b8" stroke-width="16" stroke-linecap="round"/>
+  <path d="M238 320h36" stroke="#94a3b8" stroke-width="16" stroke-linecap="round"/>
+</svg>
