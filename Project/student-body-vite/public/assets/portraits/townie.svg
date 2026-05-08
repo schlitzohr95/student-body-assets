@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="bg-townie" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#b45309"/>
+      <stop offset="1" stop-color="#f59e0b"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#bg-townie)"/>
+  <circle cx="372" cy="132" r="42" fill="#ffffff" opacity="0.12"/>
+  <circle cx="184" cy="196" r="84" fill="#f2c7a3"/>
+  <path d="M128 188c12-58 54-92 106-92s94 34 106 92v56H128z" fill="#3f2d20"/>
+  <path d="M150 168c18-18 48-30 106-30s88 12 106 30" fill="none" stroke="#fdba74" stroke-width="14" stroke-linecap="round"/>
+  <circle cx="154" cy="208" r="8" fill="#3f2d20"/>
+  <circle cx="214" cy="208" r="8" fill="#3f2d20"/>
+  <path d="M152 242c16 10 52 10 68 0" fill="none" stroke="#3f2d20" stroke-width="8" stroke-linecap="round"/>
+  <path d="M210 292c-24 8-42 28-52 58l-24 104h244l-24-104c-10-30-28-50-52-58-16 10-32 16-36 16s-20-6-36-16z" fill="#f8fafc"/>
+  <path d="M172 344h72" stroke="#b45309" stroke-width="14" stroke-linecap="round"/>
+  <path d="M310 318l22-20 22 20v42h-44z" fill="#7c2d12"/>
+  <path d="M316 328h32v26h-32z" fill="#fff" opacity="0.9"/>
+</svg>

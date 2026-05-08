@@ -1,0 +1,490 @@
+:root {
+  color-scheme: dark;
+  font-family: Georgia, "Times New Roman", serif;
+  background: #0f0d0a;
+  color: #f0ebdc;
+  font-synthesis: none;
+  text-rendering: geometricPrecision;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+  background: #0f0d0a;
+}
+
+button {
+  font: inherit;
+}
+
+.loading-screen,
+.game-shell {
+  min-height: 100vh;
+}
+
+.loading-screen {
+  display: grid;
+  place-items: center;
+  color: #c8a165;
+  font-style: italic;
+}
+
+.game-shell {
+  width: min(100%, 1400px);
+  height: 100vh;
+  margin: 0 auto;
+  display: grid;
+  grid-template-rows: minmax(0, 74fr) minmax(190px, 26fr);
+  overflow: hidden;
+  background: #141210;
+}
+
+.scene-region {
+  position: relative;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scene-image,
+.scene-image__asset {
+  position: absolute;
+  inset: 0;
+}
+
+.scene-image {
+  background: #1a1814;
+}
+
+.scene-image__asset {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  image-rendering: auto;
+}
+
+.scene-dim {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: rgba(8, 6, 4, 0.55);
+}
+
+.header-bar {
+  position: absolute;
+  top: 16px;
+  left: 16px;
+  z-index: 30;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 12px;
+  border: 1px solid rgba(212, 196, 168, 0.3);
+  border-radius: 8px;
+  background: rgba(20, 18, 16, 0.62);
+  color: #d8cbb3;
+  font-size: 12px;
+  backdrop-filter: blur(4px);
+}
+
+.header-bar__accent {
+  color: #c8a165;
+}
+
+.floating-controls {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.icon-button {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(212, 196, 168, 0.3);
+  border-radius: 8px;
+  background: rgba(20, 18, 16, 0.62);
+  color: #f0ebdc;
+  cursor: pointer;
+  backdrop-filter: blur(4px);
+}
+
+.icon-button:hover,
+.icon-button.is-active {
+  border-color: rgba(212, 196, 168, 0.65);
+  background: rgba(20, 18, 16, 0.9);
+}
+
+.icon-button.is-muted,
+.icon-button:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.icon-button--tiny {
+  width: 24px;
+  height: 24px;
+  border-radius: 6px;
+}
+
+.notification-banner {
+  position: absolute;
+  top: 16px;
+  left: 50%;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(520px, calc(100% - 120px));
+  padding: 10px 14px;
+  border: 1px solid rgba(200, 161, 101, 0.45);
+  border-radius: 10px;
+  background: rgba(40, 34, 28, 0.96);
+  color: #f0ebdc;
+  transform: translateX(-50%);
+  cursor: pointer;
+}
+
+.notification-banner__app {
+  color: #c8a165;
+  font-weight: 700;
+}
+
+.notification-banner__body {
+  overflow: hidden;
+  color: #d8cbb3;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.notification-banner__close {
+  color: #a89878;
+  font-family: system-ui, sans-serif;
+}
+
+.dialogue-strip {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 12px;
+  min-height: 0;
+  padding: 20px 28px 18px;
+  border-top: 1px solid rgba(212, 196, 168, 0.18);
+  background: rgba(20, 18, 16, 0.96);
+}
+
+.dialogue-strip__text {
+  overflow: auto;
+  color: #f0ebdc;
+  font-size: 15px;
+  line-height: 1.55;
+}
+
+.choice-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.choice-button {
+  padding: 8px 14px;
+  border: 1px solid rgba(212, 196, 168, 0.3);
+  border-radius: 6px;
+  background: rgba(200, 161, 101, 0.08);
+  color: #f0ebdc;
+  cursor: pointer;
+}
+
+.choice-button:hover {
+  border-color: rgba(212, 196, 168, 0.65);
+  background: rgba(200, 161, 101, 0.18);
+}
+
+.phone-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 25;
+  pointer-events: none;
+}
+
+.phone-frame {
+  position: absolute;
+  pointer-events: auto;
+}
+
+.phone-frame--portrait {
+  top: 50%;
+  right: 5%;
+  width: min(30%, 280px);
+  height: min(88%, 590px);
+  transform: translateY(-50%);
+}
+
+.phone-frame--landscape {
+  top: 50%;
+  left: 50%;
+  width: min(92%, 880px);
+  height: min(88%, 420px);
+  transform: translate(-50%, -50%);
+}
+
+.phone-frame__bezel {
+  position: absolute;
+  inset: 0;
+  padding: 10px;
+  border-radius: 24px;
+  background: #080808;
+  box-shadow: 0 14px 48px rgba(0, 0, 0, 0.55), 0 0 0 1.5px #28221c, inset 0 0 0 1px rgba(80, 70, 55, 0.4);
+}
+
+.phone-frame__screen {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #f0ebdc;
+  color: #302b24;
+}
+
+.phone-frame__close {
+  position: absolute;
+  top: -14px;
+  right: -14px;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border: 1px solid rgba(212, 196, 168, 0.65);
+  border-radius: 50%;
+  background: rgba(20, 18, 16, 0.95);
+  color: #f0ebdc;
+  cursor: pointer;
+}
+
+.phone-home {
+  height: 100%;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.phone-status {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 18px 8px;
+  color: #3a3530;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.phone-status__battery {
+  width: 20px;
+  height: 10px;
+  border: 1px solid #3a3530;
+  border-radius: 2px;
+  box-shadow: inset 12px 0 0 #3a3530;
+}
+
+.phone-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-content: start;
+  padding: 14px;
+  overflow: auto;
+}
+
+.phone-app-button {
+  min-height: 78px;
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+  padding: 8px 4px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #3a3530;
+  cursor: pointer;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+}
+
+.phone-app-button:hover {
+  background: rgba(58, 53, 48, 0.08);
+}
+
+.phone-app-button__icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 10px;
+}
+
+.compass-app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px;
+  background: #1a1814;
+  color: #f0ebdc;
+}
+
+.phone-panel {
+  min-height: 0;
+  padding: 12px;
+  border: 1px solid rgba(240, 235, 220, 0.12);
+  border-radius: 8px;
+  background: rgba(240, 235, 220, 0.04);
+}
+
+.phone-panel h2 {
+  margin: 0 0 10px;
+  color: #c8a165;
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  letter-spacing: 1.4px;
+  text-transform: uppercase;
+}
+
+.location-list,
+.roster-list,
+.self-app {
+  display: grid;
+  gap: 8px;
+}
+
+.location-button {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(240, 235, 220, 0.08);
+  border-radius: 6px;
+  background: transparent;
+  color: #f0ebdc;
+  cursor: pointer;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+  text-align: left;
+}
+
+.location-button.is-current {
+  border-color: rgba(200, 161, 101, 0.4);
+  background: rgba(200, 161, 101, 0.18);
+  color: #c8a165;
+  cursor: default;
+}
+
+.roster-list,
+.self-app,
+.empty-state {
+  height: 100%;
+  padding: 14px;
+  overflow: auto;
+  font-family: system-ui, sans-serif;
+}
+
+.roster-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid rgba(58, 53, 48, 0.1);
+  border-radius: 8px;
+  background: rgba(58, 53, 48, 0.05);
+}
+
+.roster-card__portrait {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+}
+
+.roster-card h2 {
+  margin: 0 0 2px;
+  font-size: 14px;
+}
+
+.roster-card p {
+  margin: 0;
+  color: #7a6e58;
+  font-size: 12px;
+}
+
+.stat-row {
+  display: grid;
+  gap: 4px;
+  margin-bottom: 10px;
+}
+
+.stat-row__label,
+.resource-row {
+  display: flex;
+  justify-content: space-between;
+  color: #3a3530;
+  font-size: 12px;
+}
+
+.stat-row__track {
+  height: 6px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: rgba(58, 53, 48, 0.12);
+}
+
+.stat-row__fill {
+  height: 100%;
+  border-radius: inherit;
+  background: #c8a165;
+}
+
+.empty-state {
+  display: grid;
+  place-content: center;
+  gap: 6px;
+  color: #7a6e58;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .game-shell {
+    grid-template-rows: minmax(0, 68fr) minmax(210px, 32fr);
+  }
+
+  .header-bar {
+    right: 70px;
+    flex-wrap: wrap;
+  }
+
+  .dialogue-strip {
+    padding: 16px;
+  }
+
+  .phone-frame--portrait {
+    left: 50%;
+    right: auto;
+    width: min(86%, 330px);
+    transform: translate(-50%, -50%);
+  }
+
+  .phone-frame--landscape {
+    width: 94%;
+    height: 78%;
+  }
+
+  .compass-app {
+    grid-template-columns: 1fr;
+  }
+}

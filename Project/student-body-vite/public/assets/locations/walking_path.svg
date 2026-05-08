@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 800" width="1280" height="800">
+  <defs>
+    <linearGradient id="bg-path" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#dcfce7"/>
+      <stop offset="1" stop-color="#86efac"/>
+    </linearGradient>
+  </defs>
+  <rect width="1280" height="800" fill="url(#bg-path)"/>
+  <rect y="520" width="1280" height="280" fill="#16a34a"/>
+  <path d="M180 800c74-78 158-140 250-186s184-74 276-84 180-38 262-92 152-128 212-222" fill="none" stroke="#d97706" stroke-width="56" stroke-linecap="round"/>
+  <path d="M180 800c74-78 158-140 250-186s184-74 276-84 180-38 262-92 152-128 212-222" fill="none" stroke="#fffbeb" stroke-width="24" stroke-dasharray="40 30" stroke-linecap="round"/>
+  <circle cx="220" cy="200" r="88" fill="#f59e0b" opacity="0.18"/>
+  <circle cx="1040" cy="180" r="88" fill="#f59e0b" opacity="0.18"/>
+  <circle cx="380" cy="610" r="30" fill="#f2c7a3"/>
+  <path d="M346 648c8-22 22-34 34-34s26 12 34 34v42h-68z" fill="#1f2937"/>
+  <circle cx="920" cy="580" r="30" fill="#f2c7a3"/>
+  <path d="M886 618c8-22 22-34 34-34s26 12 34 34v42h-68z" fill="#1f2937"/>
+</svg>
