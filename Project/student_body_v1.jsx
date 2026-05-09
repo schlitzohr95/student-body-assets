@@ -226,6 +226,7 @@ function makeFreshState() {
       name: "You",
       stats:    { knowledge: 30, athletics: 25, charm: 35, sensitivity: 40, grit: 30 },
       resources:{ energy: 80, money: 50 },
+      inventory: {},
       traits: [],
       relationships: {},
     },
@@ -254,6 +255,7 @@ function normalizeState(state) {
       ...player,
       stats: { ...fresh.player.stats, ...(player.stats || {}) },
       resources: { ...fresh.player.resources, ...(player.resources || {}) },
+      inventory: normalizeInventory(player.inventory || state.inventory || {}),
       traits: Array.isArray(player.traits) ? player.traits : [],
       relationships: normalizeRelationshipMap(player.relationships || {}),
     },
@@ -1029,6 +1031,19 @@ const RELATIONSHIP_FLAG_LABELS = {
   date_planned: "Date planned",
 };
 
+const INVENTORY_ITEMS = {
+  notebook: { label: "Notebook", description: "Useful for class notes and study sessions." },
+  granola_bar: { label: "Granola Bar", description: "Emergency food for a long day." },
+  energy_drink: { label: "Energy Drink", description: "A short-term energy boost with questionable taste." },
+  bus_ticket: { label: "Bus Ticket", description: "Covers one bus ride across campus or into town." },
+};
+
+const TRANSIT_MODES = {
+  walk: { label: "Walk", moneyCost: 0, energyPerChunk: 1, timeFactor: 1, minChunks: 1 },
+  bus: { label: "Bus", moneyCost: 2, ticketItem: "bus_ticket", energyPerChunk: 0, timeFactor: 0.55, minChunks: 1 },
+  ride: { label: "Ride", moneyCost: 8, energyPerChunk: 0, timeFactor: 0.25, minChunks: 1 },
+};
+
 const ACTIVITY_DEFINITIONS = {
   study_deep: {
     label: "Focused study",
@@ -1099,12 +1114,35 @@ const ACTIVITY_DEFINITIONS = {
     stats: { sensitivity: 2, charm: 1 },
     event: "People-watched in the student union.",
   },
+  drink_coffee: {
+    label: "Coffee",
+    groups: ["coffee", "self-care"],
+    resources: { energy: 10, money: -3 },
+    event: "Bought a coffee and took a minute to breathe.",
+    gates: [{ kind: "resource", key: "money", min: 3, label: "Money" }],
+  },
+  buy_energy_drink: {
+    label: "Energy drink",
+    groups: ["self-care"],
+    resources: { energy: 4, money: -4 },
+    inventory: { energy_drink: 1 },
+    event: "Bought an energy drink for later.",
+    gates: [{ kind: "resource", key: "money", min: 4, label: "Money" }],
+  },
   eat_meal: {
     label: "Real meal",
     groups: ["self-care"],
-    resources: { energy: 14, money: -4 },
+    resources: { energy: 18, money: -6 },
     event: "Ate a real meal at the dining hall.",
-    gates: [{ kind: "resource", key: "money", min: 4, label: "Money" }],
+    gates: [{ kind: "resource", key: "money", min: 6, label: "Money" }],
+  },
+  grab_snack: {
+    label: "Snack",
+    groups: ["self-care"],
+    resources: { energy: 7, money: -5 },
+    inventory: { granola_bar: 1 },
+    event: "Grabbed a snack and tucked one away for later.",
+    gates: [{ kind: "resource", key: "money", min: 5, label: "Money" }],
   },
   sit_with_strangers: {
     label: "Small talk",
@@ -1125,8 +1163,28 @@ const ACTIVITY_DEFINITIONS = {
     groups: ["prepared"],
     stats: { grit: 1 },
     resources: { money: -8 },
+    inventory: { notebook: 1 },
     event: "Bought basic school supplies.",
     gates: [{ kind: "resource", key: "money", min: 8, label: "Money" }],
+  },
+  buy_bus_tickets: {
+    label: "Bus tickets",
+    groups: ["prepared"],
+    resources: { money: -8 },
+    inventory: { bus_ticket: 4 },
+    event: "Bought a small packet of bus tickets.",
+    gates: [{ kind: "resource", key: "money", min: 8, label: "Money" }],
+  },
+  bookstore_shift: {
+    label: "Bookstore shift",
+    groups: ["work", "prepared"],
+    stats: { grit: 2 },
+    resources: { money: 28, energy: -22 },
+    event: "Worked a short shift at the bookstore.",
+    gates: [
+      { kind: "resource", key: "energy", min: 25, label: "Energy" },
+      { kind: "stat", key: "grit", min: 25, label: "Grit" },
+    ],
   },
   review_notes: {
     label: "Review notes",
@@ -1150,8 +1208,8 @@ const ACTIVITY_DEFINITIONS = {
     label: "Coffee shop study",
     groups: ["study", "coffee"],
     stats: { knowledge: 2 },
-    resources: { energy: 2, money: -3 },
-    event: "Studied for a while in the coffee shop window booth.",
+    resources: { energy: 5, money: -3 },
+    event: "Studied for a while in the coffee shop window booth with a coffee.",
     gates: [{ kind: "resource", key: "money", min: 3, label: "Money" }],
   },
   chat_counter: {
@@ -1181,6 +1239,7 @@ const REPEATED_ACTIVITY_TRAITS = [
   { trait: "takes care of himself", groups: ["self-care"], threshold: 3 },
   { trait: "coffee shop regular", groups: ["coffee"], threshold: 3 },
   { trait: "needs air to think", groups: ["outdoors"], threshold: 3 },
+  { trait: "keeps a schedule", groups: ["work"], threshold: 2 },
 ];
 
 function clampValue(value, min = 0, max = 100) {
@@ -1272,6 +1331,38 @@ function changeResources(state, changes) {
   if (typeof changes?.energy === "number") resources.energy = clampValue((resources.energy || 0) + changes.energy);
   if (typeof changes?.money === "number") resources.money = Math.max(0, (resources.money || 0) + changes.money);
   return { ...state, player: { ...state.player, resources } };
+}
+
+function normalizeInventory(inventory = {}) {
+  if (Array.isArray(inventory)) {
+    return inventory.reduce((items, item) => {
+      const id = typeof item === "string" ? item : item?.id;
+      const qty = typeof item === "string" ? 1 : Number(item?.qty ?? item?.quantity ?? 1);
+      if (!id || !Number.isFinite(qty) || qty <= 0) return items;
+      return { ...items, [id]: (items[id] || 0) + qty };
+    }, {});
+  }
+
+  if (!inventory || typeof inventory !== "object") return {};
+  return Object.fromEntries(
+    Object.entries(inventory)
+      .map(([id, qty]) => [id, Math.max(0, Math.floor(Number(qty) || 0))])
+      .filter(([, qty]) => qty > 0)
+  );
+}
+
+function getInventoryQty(state, itemId) {
+  return normalizeInventory(state.player?.inventory || {})[itemId] || 0;
+}
+
+function changeInventory(state, changes = {}) {
+  const inventory = normalizeInventory(state.player?.inventory || {});
+  for (const [itemId, delta] of Object.entries(changes || {})) {
+    const nextQty = (inventory[itemId] || 0) + Number(delta || 0);
+    if (nextQty > 0) inventory[itemId] = Math.floor(nextQty);
+    else delete inventory[itemId];
+  }
+  return { ...state, player: { ...state.player, inventory } };
 }
 
 function changeRelationship(state, npcId, delta, status, details = {}) {
@@ -1423,6 +1514,22 @@ function statResourceDiff(before, after) {
   return feedback;
 }
 
+function inventoryDiff(before, after) {
+  const feedback = [];
+  const beforeInventory = normalizeInventory(before.player?.inventory || {});
+  const afterInventory = normalizeInventory(after.player?.inventory || {});
+  const itemIds = uniqueCompact([...Object.keys(beforeInventory), ...Object.keys(afterInventory)]);
+
+  for (const itemId of itemIds) {
+    const delta = (afterInventory[itemId] || 0) - (beforeInventory[itemId] || 0);
+    if (!delta) continue;
+    const label = INVENTORY_ITEMS[itemId]?.label || itemId;
+    feedback.push(`${label} ${delta > 0 ? "+" : ""}${delta}`);
+  }
+
+  return feedback;
+}
+
 function applyRepeatedActivityTraits(state) {
   let next = state;
   const gained = [];
@@ -1442,7 +1549,7 @@ function applyRepeatedActivityTraits(state) {
 }
 
 function buildActivityFeedback(before, after, traitGains = [], diminished = false) {
-  const parts = statResourceDiff(before, after);
+  const parts = [...statResourceDiff(before, after), ...inventoryDiff(before, after)];
   if (traitGains.length) parts.push(`Trait: ${traitGains.join(", ")}`);
   if (diminished) parts.push("repeated recently, gains softened");
   return parts.length ? parts.join("; ") : "No mechanical change.";
@@ -1495,6 +1602,7 @@ function resolveActivity(state, choice, definition) {
 
   if (definition.stats) next = changeStats(next, statChanges);
   if (definition.resources) next = changeResources(next, definition.resources);
+  if (definition.inventory) next = changeInventory(next, definition.inventory);
 
   if (definition.relationship) {
     next = changeRelationship(next, definition.relationship.npcId, definition.relationship.delta, definition.relationship.status, {
@@ -1538,10 +1646,15 @@ function getChoiceDurationChunks(choice) {
     trail_walk: 4,
     browse_flyers: 2,
     people_watch: 4,
+    drink_coffee: 2,
+    buy_energy_drink: 1,
     eat_meal: 3,
+    grab_snack: 1,
     sit_with_strangers: 4,
     browse_books: 4,
     buy_supplies: 2,
+    buy_bus_tickets: 1,
+    bookstore_shift: 12,
     review_notes: 6,
     tidy_room: 4,
     sit_window: 6,
@@ -1563,11 +1676,60 @@ function getTravelDurationChunks(fromLocation, toLocation) {
   return 3;
 }
 
-function navigateToLocation(state, locationKey) {
+function getTravelPlan(state, locationKey, transitMode = "walk") {
+  const mode = TRANSIT_MODES[transitMode] || TRANSIT_MODES.walk;
+  const baseChunks = getTravelDurationChunks(state.location, locationKey);
+  const chunks = baseChunks === 0 ? 0 : Math.max(mode.minChunks, Math.ceil(baseChunks * mode.timeFactor));
+  const energyCost = Math.max(0, Math.ceil(chunks * mode.energyPerChunk));
+  const hasTicket = mode.ticketItem && getInventoryQty(state, mode.ticketItem) > 0;
+  const moneyCost = hasTicket ? 0 : mode.moneyCost;
+  const inventoryCost = hasTicket ? { [mode.ticketItem]: -1 } : {};
+
+  return {
+    modeId: transitMode,
+    modeLabel: mode.label,
+    chunks,
+    moneyCost,
+    energyCost,
+    inventoryCost,
+    ticketItem: hasTicket ? mode.ticketItem : null,
+  };
+}
+
+function canAffordTravel(state, plan) {
+  if ((state.player?.resources?.money || 0) < plan.moneyCost) {
+    return `Need $${plan.moneyCost} for ${plan.modeLabel.toLowerCase()}.`;
+  }
+  if ((state.player?.resources?.energy || 0) < plan.energyCost) {
+    return `Need ${plan.energyCost} energy to ${plan.modeLabel.toLowerCase()}.`;
+  }
+  return null;
+}
+
+function describeTravelPlan(plan) {
+  const parts = [formatDuration(plan.chunks)];
+  if (plan.moneyCost) parts.push(`$${plan.moneyCost}`);
+  if (plan.energyCost) parts.push(`${plan.energyCost} energy`);
+  if (plan.ticketItem) parts.push(`${INVENTORY_ITEMS[plan.ticketItem]?.label || plan.ticketItem} -1`);
+  return parts.join(" / ");
+}
+
+function navigateToLocation(state, locationKey, transitMode = "walk") {
   if (state.location === locationKey) return { state };
   const destination = LOCATIONS[locationKey]?.label || locationKey;
-  const travelChunks = getTravelDurationChunks(state.location, locationKey);
-  const next = advanceTime(appendEvent(state, `Walked to ${destination} (${formatDuration(travelChunks)})`), travelChunks);
+  const plan = getTravelPlan(state, locationKey, transitMode);
+  const failure = canAffordTravel(state, plan);
+  if (failure) {
+    return {
+      state: appendEvent(state, `Could not travel to ${destination}: ${failure}`),
+      notification: { app: "Self", body: failure },
+    };
+  }
+
+  let next = state;
+  if (plan.moneyCost || plan.energyCost) next = changeResources(next, { money: -plan.moneyCost, energy: -plan.energyCost });
+  if (Object.keys(plan.inventoryCost).length) next = changeInventory(next, plan.inventoryCost);
+  next = advanceTime(appendEvent(next, `${plan.modeLabel} to ${destination} (${describeTravelPlan(plan)})`), plan.chunks);
   return { state: { ...next, location: locationKey } };
 }
 
@@ -1736,6 +1898,7 @@ function getScriptedScene(state) {
     return {
       narration: "The shop is quieter this time. Mari spots you, gives a small nod from behind the espresso machine. The same booth by the window is open.",
       choices: [
+        { id: "drink_coffee",  label: "Buy a coffee and breathe" },
         { id: "sit_window",   label: "Take the window booth and study" },
         { id: "chat_counter", label: "Lean on the counter and chat" },
         { id: "leave",        label: "Just grab something to go" },
@@ -1782,6 +1945,8 @@ function getScriptedScene(state) {
       choices: [
         { id: "browse_flyers", label: "Browse the flyer board" },
         { id: "people_watch",  label: "People-watch from a couch" },
+        { id: "buy_bus_tickets", label: "Buy bus tickets" },
+        { id: "buy_energy_drink", label: "Buy an energy drink" },
         { id: "leave",         label: "Cut through and leave" },
       ],
     };
@@ -1792,6 +1957,7 @@ function getScriptedScene(state) {
       narration: "The dining hall hums with trays, half-finished conversations, and the practical relief of food you do not have to cook.",
       choices: [
         { id: "eat_meal",           label: "Eat a real meal" },
+        { id: "grab_snack",         label: "Grab a snack for later" },
         { id: "sit_with_strangers", label: "Sit near a busy table" },
         { id: "leave",              label: "Take something to go" },
       ],
@@ -1804,6 +1970,7 @@ function getScriptedScene(state) {
       choices: [
         { id: "browse_books", label: "Browse the back shelves" },
         { id: "buy_supplies", label: "Buy basic supplies" },
+        { id: "bookstore_shift", label: "Work a short shift" },
         { id: "leave",        label: "Head back outside" },
       ],
     };
@@ -2272,6 +2439,7 @@ function AppShell({ title, onBack, children, dark }) {
 
 function CompassApp({ state, onBack, onNavigate }) {
   // Landscape map view
+  const [transitMode, setTransitMode] = useState("walk");
   const groups = [
     { label: "Campus", cat: "campus" },
     { label: "Town",    cat: "town" },
@@ -2283,8 +2451,42 @@ function CompassApp({ state, onBack, onNavigate }) {
   return (
     <AppShell title="Compass" onBack={onBack} dark>
       <div style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        gap: 10,
+        marginBottom: 10,
+      }}>
+        <div style={{ color: "#c8a165", fontSize: 10, letterSpacing: 1.4, textTransform: "uppercase", fontWeight: 700 }}>
+          Transit
+        </div>
+        <div style={{ display: "flex", gap: 6 }}>
+          {Object.entries(TRANSIT_MODES).map(([modeId, mode]) => {
+            const active = transitMode === modeId;
+            return (
+              <button
+                type="button"
+                key={modeId}
+                onClick={() => setTransitMode(modeId)}
+                style={{
+                  padding: "5px 8px",
+                  borderRadius: 999,
+                  border: `1px solid ${active ? "rgba(200,161,101,0.58)" : "rgba(240,235,220,0.14)"}`,
+                  background: active ? "rgba(200,161,101,0.18)" : "rgba(240,235,220,0.04)",
+                  color: active ? "#c8a165" : "#f0ebdc",
+                  fontSize: 10,
+                  cursor: "pointer",
+                }}
+              >
+                {mode.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+      <div style={{
         display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14,
-        height: "100%",
+        height: "calc(100% - 38px)",
       }}>
         {groups.map(g => {
           const locs = Object.entries(LOCATIONS).filter(([_, v]) => v.cat === g.cat);
@@ -2305,14 +2507,14 @@ function CompassApp({ state, onBack, onNavigate }) {
               }}>
                 {locs.map(([key, v]) => {
                   const isHere = key === here;
-                  const travelChunks = getTravelDurationChunks(here, key);
+                  const travelPlan = getTravelPlan(state, key, transitMode);
                   const npcHits = getNpcPresenceAtLocation(state, key, directory);
                   const calendarHits = getCalendarItemsAtLocation(state, key);
-                  const hasIndicators = npcHits.length > 0 || calendarHits.length > 0 || travelChunks > 0;
+                  const hasIndicators = npcHits.length > 0 || calendarHits.length > 0 || travelPlan.chunks > 0;
                   return (
                     <button
                       key={key}
-                      onClick={() => !isHere && onNavigate(key)}
+                      onClick={() => !isHere && onNavigate(key, transitMode)}
                       disabled={isHere}
                       style={{
                         textAlign: "left",
@@ -2353,7 +2555,7 @@ function CompassApp({ state, onBack, onNavigate }) {
                               {item.required ? "Class" : item.title}
                             </span>
                           ))}
-                          {!isHere && travelChunks > 0 && (
+                          {!isHere && travelPlan.chunks > 0 && (
                             <span style={{
                               padding: "2px 5px",
                               borderRadius: 999,
@@ -2361,7 +2563,7 @@ function CompassApp({ state, onBack, onNavigate }) {
                               color: "#bae6fd",
                               fontSize: 9,
                             }}>
-                              {formatDuration(travelChunks)}
+                              {describeTravelPlan(travelPlan)}
                             </span>
                           )}
                           {npcHits.slice(0, 2).map(npc => (
@@ -2586,6 +2788,7 @@ function RosterApp({ state, onBack }) {
 
 function SelfApp({ state, onBack }) {
   const { stats, resources } = state.player;
+  const inventoryRows = Object.entries(normalizeInventory(state.player.inventory || {}));
   const activityRows = Object.entries(normalizeActivityHistory(state.activityHistory).activities)
     .sort((a, b) => (b[1].total || 0) - (a[1].total || 0))
     .slice(0, 5);
@@ -2633,6 +2836,33 @@ function SelfApp({ state, onBack }) {
         }}>
           <span>Money</span><span style={{ color: "#7a6e58" }}>${resources.money}</span>
         </div>
+      </div>
+      <div style={{ marginTop: 18 }}>
+        <div style={{
+          fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase",
+          color: "#8b6f3d", fontWeight: 600, marginBottom: 8,
+        }}>Inventory</div>
+        {inventoryRows.length ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {inventoryRows.map(([itemId, qty]) => (
+              <div key={itemId} style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                padding: "7px 9px",
+                border: "1px solid rgba(58,53,48,0.08)",
+                borderRadius: 8,
+                background: "rgba(58,53,48,0.03)",
+                fontSize: 11,
+              }}>
+                <span title={INVENTORY_ITEMS[itemId]?.description || ""}>{INVENTORY_ITEMS[itemId]?.label || itemId}</span>
+                <span style={{ color: "#8b6f3d", fontWeight: 700 }}>{qty}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>Nothing carried yet.</span>
+        )}
       </div>
       <div style={{ marginTop: 18 }}>
         <div style={{
@@ -3141,13 +3371,15 @@ export default function StudentBody() {
     setPhone(p => ({ ...p, view: "home", orientation: "portrait" }));
   }, []);
 
-  const handleNavigate = useCallback((locationKey) => {
-    setState(s => {
-      const update = navigateToLocation(s, locationKey);
-      return normalizeState(update.state);
-    });
-    setPhone({ open: false, view: "home", orientation: "portrait" });
-  }, []);
+  const handleNavigate = useCallback((locationKey, transitMode = "walk") => {
+    if (!state) return;
+    const update = navigateToLocation(state, locationKey, transitMode);
+    setState(normalizeState(update.state));
+    if (update.notification) setTimeout(() => showNotif(update.notification), 200);
+    if (update.state.location !== state.location) {
+      setPhone({ open: false, view: "home", orientation: "portrait" });
+    }
+  }, [showNotif, state]);
 
   const handleChoice = useCallback((choice) => {
     setState(s => {
