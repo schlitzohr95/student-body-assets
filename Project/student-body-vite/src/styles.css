@@ -666,6 +666,208 @@ button {
   color: #c8a165;
 }
 
+.narrator-lab {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(240px, 0.88fr) minmax(0, 1.35fr);
+  gap: 14px;
+  padding: 14px;
+  overflow: hidden;
+  background: #1a1814;
+  color: #f0ebdc;
+  font-family: system-ui, sans-serif;
+}
+
+.narrator-lab__controls,
+.narrator-lab__output {
+  display: grid;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.narrator-lab__controls {
+  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+  gap: 10px;
+}
+
+.narrator-lab__output {
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 10px;
+}
+
+.narrator-lab__header,
+.narrator-lab__actions,
+.segmented-control,
+.narrator-tabs {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.narrator-lab__header {
+  justify-content: space-between;
+}
+
+.narrator-lab__header strong {
+  display: block;
+  color: #f0ebdc;
+  font-size: 15px;
+}
+
+.narrator-lab__header span {
+  color: #a89878;
+  font-size: 11px;
+}
+
+.segmented-control,
+.narrator-tabs {
+  padding: 3px;
+  border: 1px solid rgba(240, 235, 220, 0.12);
+  border-radius: 8px;
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.segmented-control button,
+.narrator-tabs button,
+.narrator-lab__actions button {
+  min-height: 30px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: #d8cbb3;
+  cursor: pointer;
+  font: 700 11px/1 system-ui, sans-serif;
+  text-transform: capitalize;
+}
+
+.segmented-control button,
+.narrator-tabs button {
+  flex: 1;
+}
+
+.segmented-control button.is-active,
+.narrator-tabs button.is-active,
+.narrator-lab__actions button:not(:disabled) {
+  background: rgba(200, 161, 101, 0.2);
+  color: #f0ebdc;
+}
+
+.narrator-lab__actions button {
+  flex: 1;
+  border: 1px solid rgba(200, 161, 101, 0.28);
+  text-transform: none;
+}
+
+.narrator-lab__actions button:disabled {
+  cursor: default;
+  opacity: 0.48;
+}
+
+.field-stack {
+  display: grid;
+  gap: 5px;
+  color: #c8a165;
+  font: 700 10px/1 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.field-stack--grow {
+  min-height: 0;
+}
+
+.field-stack input,
+.field-stack textarea,
+.narrator-text-preview {
+  width: 100%;
+  border: 1px solid rgba(240, 235, 220, 0.14);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.24);
+  color: #f0ebdc;
+  font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.field-stack input {
+  min-height: 32px;
+  padding: 7px 9px;
+}
+
+.field-stack textarea {
+  min-height: 0;
+  height: 100%;
+  resize: none;
+  padding: 9px;
+}
+
+.narrator-text-preview {
+  height: 100%;
+  min-height: 0;
+  resize: none;
+  padding: 10px;
+}
+
+.narrator-error {
+  padding: 8px 10px;
+  border: 1px solid rgba(218, 96, 72, 0.35);
+  border-radius: 6px;
+  background: rgba(218, 96, 72, 0.12);
+  color: #ffd7ce;
+  font-size: 12px;
+}
+
+.narrator-result {
+  display: grid;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.narrator-result article {
+  display: grid;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(240, 235, 220, 0.08);
+}
+
+.narrator-result h3,
+.narrator-result p {
+  margin: 0;
+}
+
+.narrator-result h3 {
+  color: #c8a165;
+  font-size: 11px;
+}
+
+.narrator-result p,
+.narrator-choice-list span {
+  color: #e2d7c0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.narrator-choice-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.narrator-choice-list span {
+  padding: 6px 8px;
+  border: 1px solid rgba(240, 235, 220, 0.12);
+  border-radius: 6px;
+  background: rgba(240, 235, 220, 0.05);
+}
+
+.narrator-result pre {
+  max-height: 150px;
+  margin: 0;
+  overflow: auto;
+  color: #d8cbb3;
+  font: 11px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
 @media (max-width: 760px) {
   .game-shell {
     grid-template-rows: minmax(0, 68fr) minmax(210px, 32fr);
@@ -693,7 +895,8 @@ button {
   }
 
   .anthrop-app,
-  .buzz-app {
+  .buzz-app,
+  .narrator-lab {
     grid-template-columns: 1fr;
   }
 }

@@ -11,7 +11,7 @@ export const APPS: PhoneAppDefinition[] = [
   { id: "margin", label: "Margin", role: "Notes", layout: "portrait", implemented: true },
   { id: "lens", label: "Lens", role: "Camera", layout: "landscape", implemented: false },
   { id: "wake", label: "Wake", role: "Alarm", layout: "portrait", implemented: false },
-  { id: "beacon", label: "Beacon", role: "Browser", layout: "landscape", implemented: false },
+  { id: "beacon", label: "Beacon", role: "Narrator Lab", layout: "landscape", implemented: true },
 ];
 
 export const APP_BY_ID = Object.fromEntries(APPS.map(app => [app.id, app])) as Record<string, PhoneAppDefinition>;

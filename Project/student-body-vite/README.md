@@ -15,7 +15,7 @@ npm install
 npm run dev
 ```
 
-The first pass still uses scripted scenes by default. The narrator pipeline is present in `src/narrator`, so Phase 1.3 can wire live model calls into the same state/update loop without rewriting the UI.
+The main scene still uses scripted scenes by default. Beacon now opens a Narrator Lab for single-call generation tests against the same context assembler, parser, and state-patch code the real game loop will use.
 
 Current non-LLM gameplay coverage:
 
@@ -26,3 +26,33 @@ Current non-LLM gameplay coverage:
 - Margin shows notes and recent event history.
 
 See [docs/architecture.md](docs/architecture.md) for the folder map and where future work should land.
+
+## Narrator Lab
+
+Open the phone, tap Beacon, and run the mock provider first. The mock path never leaves the browser and is useful for checking context shape, parsing, and state-patch application.
+
+Provider options:
+
+- `mock`: deterministic local response for UI and parser testing.
+- `window`: calls `window.studentBodyNarrator.complete(request)` if present, then falls back to the older `window.claude.complete({ system, messages })` shape.
+- `http`: posts to a local/proxy endpoint such as `http://127.0.0.1:8787/narrate`.
+
+HTTP request shape:
+
+```json
+{
+  "system": "system prompt",
+  "messages": [{ "role": "user", "content": "assembled scene context" }],
+  "context": "assembled scene context",
+  "action": "player action text",
+  "model": "optional-model-name",
+  "stateSummary": {
+    "day": 1,
+    "timeSlot": 32,
+    "location": "coffee_shop",
+    "presentNpcIds": ["mari"]
+  }
+}
+```
+
+The endpoint can return plain text, `{ "text": "..." }`, `{ "content": "..." }`, OpenAI-style `{ "choices": [{ "message": { "content": "..." } }] }`, or Anthropic-style `{ "content": [{ "type": "text", "text": "..." }] }`.

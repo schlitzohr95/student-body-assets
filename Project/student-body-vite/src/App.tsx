@@ -3,12 +3,15 @@ import { APP_BY_ID } from "./data/apps";
 import { getScriptedScene } from "./engine/scriptedScenes";
 import { makeFreshState, normalizeState } from "./engine/state";
 import { addMarginNote, applyChoice, navigateToLocation, sendPulseMessage } from "./engine/transitions";
+import { applyNarratorStatePatch } from "./narrator/patch";
+import type { NarratorRunResult } from "./narrator/client";
 import { clearState, loadState, saveState } from "./services/storage";
 import type { Choice, GameState, LocationId } from "./types/game";
 import { CompassApp } from "./ui/apps/CompassApp";
 import { AnthropApp } from "./ui/apps/AnthropApp";
 import { BuzzApp } from "./ui/apps/BuzzApp";
 import { MarginApp } from "./ui/apps/MarginApp";
+import { NarratorLabApp } from "./ui/apps/NarratorLabApp";
 import { PulseApp } from "./ui/apps/PulseApp";
 import { RosterApp } from "./ui/apps/RosterApp";
 import { SelfApp } from "./ui/apps/SelfApp";
@@ -121,6 +124,14 @@ export default function App() {
     setState(addMarginNote(state, text).state);
   }, [state]);
 
+  const handleApplyNarratorResult = useCallback((result: NarratorRunResult) => {
+    setState(current => current ? applyNarratorStatePatch(current, result.parsed.statePatch) : current);
+    showNotification({
+      app: "Beacon",
+      body: result.parsed.statePatch ? "Narrator state patch applied." : "No state patch was available.",
+    });
+  }, [showNotification]);
+
   if (!loaded || !state) {
     return <main className="loading-screen">Loading...</main>;
   }
@@ -140,6 +151,7 @@ export default function App() {
     else if (appId === "buzz") phoneContent = <BuzzApp state={state} />;
     else if (appId === "anthrop") phoneContent = <AnthropApp state={state} />;
     else if (appId === "margin") phoneContent = <MarginApp state={state} onAddNote={handleAddNote} />;
+    else if (appId === "beacon") phoneContent = <NarratorLabApp state={state} onApplyResult={handleApplyNarratorResult} />;
     else if (app) phoneContent = <StubApp app={app} />;
   }
 

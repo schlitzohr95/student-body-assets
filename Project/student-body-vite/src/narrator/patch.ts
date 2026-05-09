@@ -1,10 +1,25 @@
-import type { GameState, Npc, RelationshipRecord, StatKey } from "../types/game";
+import { appendEvent } from "../engine/state";
+import type { GameEvent, GameState, Npc, RelationshipRecord, StatKey } from "../types/game";
 
 const STAT_KEYS: StatKey[] = ["charm", "sensitivity", "knowledge", "athletics", "grit"];
 
 const isRecord = (value: unknown): value is Record<string, unknown> => Boolean(value) && typeof value === "object" && !Array.isArray(value);
 const asStringArray = (value: unknown): string[] => Array.isArray(value) ? value.filter((item): item is string => typeof item === "string") : [];
 const clampStat = (value: number) => Math.max(0, Math.min(100, value));
+
+function asWitnesses(value: unknown): GameEvent["witnesses"] {
+  if (!Array.isArray(value)) return [];
+  return value
+    .map(item => {
+      if (typeof item === "string") return item;
+      if (!isRecord(item)) return null;
+      const id = typeof item.id === "string" ? item.id : undefined;
+      const key = typeof item.key === "string" ? item.key : undefined;
+      const name = typeof item.name === "string" ? item.name : undefined;
+      return id || key || name ? { id, key, name } : null;
+    })
+    .filter(Boolean) as GameEvent["witnesses"];
+}
 
 function applyStatChanges(state: GameState, changes: unknown): GameState {
   if (!isRecord(changes)) return state;
@@ -94,6 +109,16 @@ export function applyNarratorStatePatch(state: GameState, patch: Record<string, 
   if (!patch) return state;
 
   let next = state;
+  const eventSummary = typeof patch.event_summary === "string"
+    ? patch.event_summary
+    : typeof patch.eventSummary === "string"
+      ? patch.eventSummary
+      : "";
+
+  if (eventSummary.trim()) {
+    next = appendEvent(next, eventSummary.trim(), asWitnesses(patch.witnesses || patch.witness_ids || patch.witnessIds));
+  }
+
   next = applyStatChanges(next, patch.stat_changes || patch.statDeltas);
   next = applyResourceChanges(next, patch.resource_changes || patch.resourceDeltas);
   next = applyTraitChanges(next, patch.trait_changes);

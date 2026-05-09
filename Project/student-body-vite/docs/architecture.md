@@ -14,7 +14,7 @@ This folder is intentionally split as if the project will become a real game, no
 : Deterministic game rules. Time advancement, event-log writes, navigation, choice effects, and scripted fallback scenes live here. These functions should not call the LLM or touch React state directly.
 
 `src/narrator`
-: LLM boundary. This owns scene-context assembly, response parsing, state-patch application, and the client call wrapper. It should stay testable without React.
+: LLM boundary. This owns scene-context assembly, provider-agnostic request adapters, response parsing, and state-patch application. It should stay testable without React and should not know about phone screens.
 
 `src/services`
 : Browser services and adapters. Persistence currently supports `localStorage` plus the artifact-style `window.storage` shape so the code can travel in either direction.
@@ -31,8 +31,23 @@ This folder is intentionally split as if the project will become a real game, no
 2. `src/engine/transitions.ts` produces the next deterministic state.
 3. Later, `src/narrator/client.ts` can call the model using `buildNarratorContext`.
 4. `parseNarratorResponse` extracts prose, choices, and `[STATE]`.
-5. `applyNarratorStatePatch` merges model-approved changes into state.
+5. `applyNarratorStatePatch` writes `event_summary` to the log and merges model-approved changes into state.
 6. `src/services/storage.ts` persists the result.
+
+## Narrator Boundary
+
+`requestNarratorScene` accepts a provider config instead of a model-specific SDK. Current provider types are:
+
+`mock`
+: Local deterministic response. Use this to test UI wiring, parsing, and patch application.
+
+`window`
+: Browser bridge for artifact hosts or injected SDKs. It checks `window.studentBodyNarrator.complete(request)` first, then legacy `window.claude.complete({ system, messages })`.
+
+`http`
+: Local/proxy endpoint. Keep API keys out of the browser; this app only posts the already-assembled request and accepts common text response shapes.
+
+Beacon's `NarratorLabApp` is the manual harness for trying one generation at a time. When the full game loop is ready, keep Beacon as a debug surface and call the same narrator functions from the normal choice/action flow.
 
 ## What Goes Where
 
