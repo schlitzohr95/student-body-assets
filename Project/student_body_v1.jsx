@@ -240,6 +240,7 @@ function makeFreshState() {
     missedBlocks: [],
     eventLog: [],
     activityHistory: { activities: {} },
+    academicTests: { completed: {} },
     wake: { alarmSlot: timeChunk(7, 30), lastSleep: null },
   };
 }
@@ -275,6 +276,7 @@ function normalizeState(state) {
     missedBlocks: migrateTimedRecords(state.missedBlocks, legacyTimeScale),
     eventLog: migrateTimedRecords(state.eventLog, legacyTimeScale),
     activityHistory: normalizeActivityHistory(state.activityHistory),
+    academicTests: normalizeAcademicTests(state.academicTests),
     wake: {
       ...fresh.wake,
       ...(state.wake || {}),
@@ -299,6 +301,7 @@ const PLAYER_WEEKLY_SCHEDULE = [
 ];
 
 const SEMESTER_CALENDAR_EVENTS = [
+  { id: "seminar_diagnostic", title: "First-Year Seminar Diagnostic", kind: "exam", location: "lecture_hall", week: 1, dayIndex: 0, start: timeChunk(9), end: timeChunk(10, 15) },
   { id: "orientation_mixer", title: "Orientation Mixer", kind: "event", location: "student_union", week: 1, dayIndex: 0, start: timeChunk(18), end: timeChunk(20) },
   { id: "club_fair", title: "Club Fair", kind: "event", location: "quad", week: 1, dayIndex: 2, start: timeChunk(15), end: timeChunk(17) },
   { id: "first_library_workshop", title: "Library Research Workshop", kind: "event", location: "library_main", week: 1, dayIndex: 3, start: timeChunk(15, 30), end: timeChunk(16, 30) },
@@ -1123,6 +1126,125 @@ const WAKE_ALARMS = [
   timeChunk(10, 30),
 ];
 
+const STUDY_ACTIVITY_WEIGHTS = {
+  study_deep: 1.4,
+  review_notes: 1.2,
+  sit_window: 0.9,
+  browse_stacks: 0.65,
+  browse_books: 0.45,
+};
+
+const TEST_DAY_MINIGAMES = {
+  seminar_diagnostic: {
+    subject: "First-Year Seminar",
+    stat: "knowledge",
+    title: "Argument Map",
+    prompts: {
+      easy: {
+        prompt: "The passage says campus traditions matter because they turn strangers into a community. Which claim is the central one?",
+        hint: "Your notes make the structure familiar: evidence supports the community claim.",
+        choices: [
+          { id: "community", label: "Traditions help strangers become a community.", correct: true, reason: "That is the claim every example supports." },
+          { id: "nostalgia", label: "Old rituals are mostly about nostalgia.", correct: false, reason: "Nostalgia appears as a detail, not the central claim." },
+          { id: "clubs", label: "Clubs should advertise more clearly.", correct: false, reason: "Club flyers are an example, not the argument." },
+        ],
+      },
+      standard: {
+        prompt: "A short passage links dorm rituals, club fairs, and shared routes across campus. Which sentence would best serve as its thesis?",
+        hint: "Look for the sentence that explains the examples instead of merely listing them.",
+        choices: [
+          { id: "community", label: "Small repeated rituals make a campus feel socially legible.", correct: true, reason: "It explains why the examples matter." },
+          { id: "events", label: "Orientation events are crowded but useful.", correct: false, reason: "That is narrower than the full passage." },
+          { id: "routes", label: "Students learn campus fastest by walking it.", correct: false, reason: "Routes are one example among several." },
+          { id: "history", label: "Traditions should be preserved because they are old.", correct: false, reason: "The passage cares about social function, not age." },
+        ],
+      },
+      hard: {
+        prompt: "The passage never states its thesis directly: it contrasts private routines with public rituals, then describes first-years relaxing once repeated encounters become predictable. What inference best captures the argument?",
+        hint: "This is the harder version: find the abstract pattern underneath the scenes.",
+        choices: [
+          { id: "predictable", label: "Belonging begins when repeated public patterns become predictable enough to trust.", correct: true, reason: "This captures the contrast and the conclusion." },
+          { id: "privacy", label: "Private routines are healthier than public traditions.", correct: false, reason: "The passage contrasts them, but does not rank privacy above ritual." },
+          { id: "efficiency", label: "Predictable schedules improve academic efficiency.", correct: false, reason: "The passage is about belonging, not productivity." },
+          { id: "friendship", label: "Friendship depends on joining the right clubs early.", correct: false, reason: "Clubs are incidental; repeated patterns are the larger idea." },
+        ],
+      },
+    },
+  },
+  first_midterm: {
+    subject: "Intro Psych",
+    stat: "knowledge",
+    title: "Memory Model",
+    prompts: {
+      easy: {
+        prompt: "A study participant remembers the first and last words in a list best. Which effect pair explains that pattern?",
+        hint: "Your review notes put these terms side by side.",
+        choices: [
+          { id: "serial", label: "Primacy and recency effects.", correct: true, reason: "The first items benefit from primacy; the last from recency." },
+          { id: "conditioning", label: "Classical and operant conditioning.", correct: false, reason: "Those describe learning associations, not list-position recall." },
+          { id: "schema", label: "Schema assimilation and accommodation.", correct: false, reason: "Those are meaning structures, not serial position effects." },
+        ],
+      },
+      standard: {
+        prompt: "A participant recalls early list items after rehearsal, late list items because they are still active, and forgets the middle. Which answer best explains it?",
+        hint: "Separate long-term rehearsal from short-term availability.",
+        choices: [
+          { id: "serial", label: "Primacy reflects rehearsal; recency reflects short-term availability.", correct: true, reason: "That distinction explains both ends of the list." },
+          { id: "interference", label: "Retroactive interference explains both ends equally.", correct: false, reason: "Interference can hurt recall, but it does not explain the two-end advantage." },
+          { id: "encoding", label: "Shallow encoding improves middle-item recall.", correct: false, reason: "Shallow encoding usually weakens recall." },
+          { id: "state", label: "State-dependent memory blocks the first items.", correct: false, reason: "Nothing in the scenario changes internal state." },
+        ],
+      },
+      hard: {
+        prompt: "The test asks you to predict what happens if the participant counts backward for 30 seconds before recall. What changes most?",
+        hint: "This version assumes you remember what disrupts short-term availability.",
+        choices: [
+          { id: "recency_drop", label: "The recency advantage shrinks because the last items leave short-term memory.", correct: true, reason: "The distractor task disrupts short-term availability." },
+          { id: "primacy_drop", label: "The primacy advantage disappears because rehearsal never happened.", correct: false, reason: "Rehearsal already happened during list presentation." },
+          { id: "middle_jump", label: "Middle items become easiest because interference is cleared.", correct: false, reason: "The task does not rescue middle items." },
+          { id: "no_change", label: "Nothing changes because recall is already in long-term memory.", correct: false, reason: "Recency depends heavily on short-term memory." },
+        ],
+      },
+    },
+  },
+  finals_week_begins: {
+    subject: "Finals",
+    stat: "knowledge",
+    title: "Synthesis Problem",
+    prompts: {
+      easy: {
+        prompt: "A final essay asks you to compare two course concepts. What is the strongest opening move?",
+        hint: "Prepared notes make the structure obvious.",
+        choices: [
+          { id: "compare", label: "Define both concepts, then name the exact basis of comparison.", correct: true, reason: "It sets up a controlled comparison." },
+          { id: "quote", label: "Start with the longest quote you remember.", correct: false, reason: "A quote without a frame is not yet an argument." },
+          { id: "vibes", label: "Describe how the concepts feel similar.", correct: false, reason: "Similarity needs a specific basis." },
+        ],
+      },
+      standard: {
+        prompt: "Two concepts overlap in examples but differ in mechanism. Which structure will score best?",
+        hint: "The grader wants a distinction, not a summary pile.",
+        choices: [
+          { id: "mechanism", label: "Brief definitions, shared example, then the different mechanism each concept predicts.", correct: true, reason: "It compares overlap while preserving the key distinction." },
+          { id: "chronology", label: "Explain whichever concept appeared first in the semester, then the second.", correct: false, reason: "Chronology is weaker than conceptual contrast." },
+          { id: "memory_dump", label: "List every remembered term and let the grader connect them.", correct: false, reason: "A synthesis answer needs structure." },
+          { id: "personal", label: "Open with a personal anecdote and stay there.", correct: false, reason: "Examples help only when tied to concepts." },
+        ],
+      },
+      hard: {
+        prompt: "The final asks for a novel case, a theory choice, and a limitation. What answer pattern gives the best shot?",
+        hint: "This is the hard version: apply, justify, then qualify.",
+        choices: [
+          { id: "apply_qualify", label: "Apply one theory to the case, justify why it fits better, then name what it fails to explain.", correct: true, reason: "It handles application, comparison, and limitation." },
+          { id: "both_equal", label: "Say both theories are equally right and avoid choosing.", correct: false, reason: "The prompt asks for a theory choice." },
+          { id: "definition_only", label: "Define both theories carefully without applying either.", correct: false, reason: "Definitions alone miss the novel case." },
+          { id: "limitation_first", label: "Start with limitations until no theory seems usable.", correct: false, reason: "A limitation should qualify an argument, not replace it." },
+        ],
+      },
+    },
+  },
+};
+
 const STAT_LABELS = {
   charm: "Charm",
   sensitivity: "Sensitivity",
@@ -1541,6 +1663,11 @@ function normalizeActivityHistory(history = {}) {
   return { activities };
 }
 
+function normalizeAcademicTests(tests = {}) {
+  const completed = tests?.completed && typeof tests.completed === "object" ? tests.completed : {};
+  return { completed };
+}
+
 function countRecentActivity(state, activityId, dayWindow = 2) {
   const history = normalizeActivityHistory(state.activityHistory);
   const recent = history.activities[activityId]?.recent || [];
@@ -1697,6 +1824,182 @@ function eventSummary(event) {
 
 function noteMoment(note) {
   return formatMoment(note?.day, note?.slot);
+}
+
+function getTestDefinition(item) {
+  if (!item) return null;
+  return TEST_DAY_MINIGAMES[item.id] || null;
+}
+
+function getTestRecordId(item) {
+  if (!item) return "unknown-test";
+  return `${item.id}-${item.day || 1}`;
+}
+
+function isTestCompleted(state, item) {
+  const recordId = getTestRecordId(item);
+  return Boolean(state.academicTests?.completed?.[recordId]);
+}
+
+function getStudyPrepDetails(state, item = null) {
+  const history = normalizeActivityHistory(state.activityHistory);
+  const testAbs = absoluteMoment(item?.day || state.day, item?.slot ?? state.timeSlot);
+  const studyWindow = CHUNKS_PER_DAY * 14;
+  let weightedChunks = 0;
+  let studyChunks = 0;
+  let sessions = 0;
+
+  for (const [activityId, weight] of Object.entries(STUDY_ACTIVITY_WEIGHTS)) {
+    const recent = history.activities[activityId]?.recent || [];
+    for (const entry of recent) {
+      const then = absoluteMoment(entry.day, entry.slot);
+      if (then > testAbs || testAbs - then > studyWindow) continue;
+      const chunks = getChoiceDurationChunks({ id: activityId });
+      weightedChunks += chunks * weight;
+      studyChunks += chunks;
+      sessions += 1;
+    }
+  }
+
+  const stats = state.player?.stats || {};
+  const resources = state.player?.resources || {};
+  const score = clampValue(Math.round(
+    (weightedChunks * 2.5) +
+    ((stats.knowledge || 0) * 0.35) +
+    ((stats.grit || 0) * 0.15) +
+    (Math.max(0, (resources.energy || 0) - 20) * 0.12)
+  ));
+  const tier = score >= 70 ? "prepared" : score >= 45 ? "familiar" : "shaky";
+  const difficulty = tier === "prepared" ? "easy" : tier === "familiar" ? "standard" : "hard";
+
+  return { score, tier, difficulty, sessions, studyChunks, weightedChunks };
+}
+
+function getActiveTestItem(state) {
+  return getCurrentCalendarItems(state).find(item => (
+    item.location === state.location &&
+    getTestDefinition(item) &&
+    !isTestCompleted(state, item)
+  ));
+}
+
+function getUpcomingTestItems(state, limit = 4) {
+  const now = absoluteMoment(state.day, state.timeSlot);
+  const items = [];
+  for (let offset = 0; offset < 21 && items.length < limit; offset += 1) {
+    const day = state.day + offset;
+    const dayItems = getTodayCalendarItems(state, day)
+      .filter(item => getTestDefinition(item) && !isTestCompleted(state, item))
+      .filter(item => absoluteMoment(day, item.slot) >= now)
+      .map(item => ({ ...item, day }));
+    items.push(...dayItems);
+  }
+  return items
+    .sort((a, b) => absoluteMoment(a.day, a.slot) - absoluteMoment(b.day, b.slot))
+    .slice(0, limit);
+}
+
+function buildTestMinigameScene(state, item) {
+  const definition = getTestDefinition(item);
+  const prep = getStudyPrepDetails(state, item);
+  const question = definition.prompts[prep.difficulty] || definition.prompts.standard;
+  const prepLine = prep.sessions
+    ? `Your last two weeks include ${prep.sessions} study session${prep.sessions === 1 ? "" : "s"} (${formatDuration(prep.studyChunks)}).`
+    : "You have no recent dedicated study sessions behind you.";
+  const difficultyLabel = prep.difficulty === "easy" ? "clean" : prep.difficulty === "standard" ? "mixed" : "pressure";
+  const choices = question.choices.map(answer => ({
+    id: `test_answer_${item.id}_${answer.id}`,
+    tag: "test_answer",
+    label: answer.label,
+    calendarId: item.id,
+    testId: getTestRecordId(item),
+    testTitle: item.title,
+    subject: definition.subject,
+    difficulty: prep.difficulty,
+    prepScore: prep.score,
+    prepTier: prep.tier,
+    answerId: answer.id,
+    correct: answer.correct,
+    reason: answer.reason,
+    durationChunks: Math.max(3, Math.min(6, (item.end ?? item.slot + 4) - item.slot)),
+  }));
+
+  return {
+    narration: `${item.title}. The room has gone quiet in that specific test-day way: papers down, pencils moving, everyone suddenly very alone with what they did or did not review. ${prepLine} Prep reads ${prep.score}/100, so the question in front of you is a ${difficultyLabel} version. ${question.hint} ${question.prompt}`,
+    choices,
+  };
+}
+
+function resolveTestChoice(state, choice) {
+  const currentItem = getCurrentCalendarItems(state).find(item => getTestRecordId(item) === choice.testId) || {
+    id: choice.calendarId,
+    title: choice.testTitle,
+    kind: "exam",
+    location: state.location,
+    day: state.day,
+    slot: state.timeSlot,
+    end: state.timeSlot + (choice.durationChunks || 4),
+  };
+  const definition = getTestDefinition(currentItem) || { stat: "knowledge", subject: choice.subject || "Class" };
+  const prep = getStudyPrepDetails(state, currentItem);
+  const statValue = state.player?.stats?.[definition.stat || "knowledge"] || 0;
+  const difficultyAdjust = { easy: 8, standard: 0, hard: -8 }[choice.difficulty] || 0;
+  const correct = Boolean(choice.correct);
+  const rawScore = correct
+    ? 62 + Math.round(prep.score * 0.25) + Math.round(statValue * 0.12) + difficultyAdjust
+    : 34 + Math.round(prep.score * 0.35) + Math.round(statValue * 0.08) + difficultyAdjust;
+  const score = clampValue(rawScore);
+  const grade = score >= 90 ? "A" : score >= 80 ? "B" : score >= 70 ? "C" : score >= 60 ? "Pass" : "Needs review";
+  const passed = score >= 60;
+  const energyCost = { easy: 6, standard: 8, hard: 10 }[choice.difficulty] || 8;
+  const statGain = score >= 80 ? 3 : score >= 60 ? 2 : 1;
+
+  let next = appendEvent(state, `Answered ${choice.testTitle}: ${choice.label}`);
+  next = advanceTime(next, choice.durationChunks || 4);
+  next = changeResources(next, { energy: -energyCost });
+  next = changeStats(next, {
+    [definition.stat || "knowledge"]: statGain,
+    grit: passed ? 1 : 0,
+  });
+
+  const result = {
+    id: choice.testId,
+    calendarId: choice.calendarId,
+    title: choice.testTitle,
+    subject: definition.subject || choice.subject,
+    day: state.day,
+    slot: state.timeSlot,
+    score,
+    grade,
+    passed,
+    correct,
+    difficulty: choice.difficulty,
+    prepScore: prep.score,
+    prepTier: prep.tier,
+    studySessions: prep.sessions,
+    studyChunks: prep.studyChunks,
+    answer: choice.label,
+    reason: choice.reason,
+  };
+
+  next = {
+    ...next,
+    academicTests: {
+      completed: {
+        ...(next.academicTests?.completed || {}),
+        [choice.testId]: result,
+      },
+    },
+  };
+  next = appendEvent(next, `${choice.testTitle} result: ${score}% (${grade}). ${choice.reason} Prep ${prep.score}/100 from ${formatDuration(prep.studyChunks)} recent study.`);
+
+  return {
+    state: next,
+    notification: {
+      app: "Self",
+      body: `${choice.testTitle}: ${score}% (${grade}). ${passed ? "You got through it." : "That one needs review."}`,
+    },
+  };
 }
 
 function resolveActivity(state, choice, definition) {
@@ -1888,6 +2191,8 @@ function navigateToLocation(state, locationKey, transitMode = "walk") {
 }
 
 function applyChoice(state, choice) {
+  if (choice.tag === "test_answer") return resolveTestChoice(state, choice);
+
   let next = advanceTime(appendEvent(state, `Chose: ${choice.label}`), getChoiceDurationChunks(choice));
   let notification = null;
 
@@ -2254,9 +2559,18 @@ function getAnthropLeads(state) {
   const unread = getUnreadCount(state);
   const commitments = getUpcomingCommitments(state, 3);
   const currentRequired = getCurrentCalendarItems(state).filter(item => item.required);
+  const upcomingTests = getUpcomingTestItems(state, 2);
   const presentHere = getNpcPresenceAtLocation(state, state.location, getNpcDirectory(state));
   if (unread) leads.push({ id: "unread", title: `${unread} unread Pulse message${unread === 1 ? "" : "s"}`, detail: "Texting is live enough to decay if ignored." });
   currentRequired.forEach(item => leads.push({ id: `class-${item.id}`, title: item.title, detail: `Happening now at ${LOCATIONS[item.location]?.label || item.location}.` }));
+  upcomingTests.forEach(item => {
+    const prep = getStudyPrepDetails(state, item);
+    leads.push({
+      id: `test-${getTestRecordId(item)}`,
+      title: item.title,
+      detail: `${formatMoment(item.day, item.slot)}. Prep ${prep.score}/100 (${prep.tier}).`,
+    });
+  });
   commitments.forEach(item => leads.push({ id: item.id, title: item.title, detail: `${formatMoment(item.day, item.slot)} at ${LOCATIONS[item.location]?.label || item.location}.` }));
   presentHere.forEach(npc => leads.push({ id: `npc-${npc.id}`, title: `${npc.name || npc.id} is here`, detail: npc.scheduleNote || "A possible in-person beat." }));
   if ((state.player?.resources?.energy || 0) < 25) leads.push({ id: "energy", title: "Energy is low", detail: "Wake, food, or coffee will matter before heavier plans." });
@@ -2423,6 +2737,9 @@ async function clearState() {
 
 function getScriptedScene(state) {
   const { location, day, timeSlot, metMari, introSeen } = state;
+  const activeTest = getActiveTestItem(state);
+
+  if (activeTest) return buildTestMinigameScene(state, activeTest);
 
   if (location === "dorm_room" && !introSeen) {
     return {
@@ -3435,6 +3752,9 @@ function SelfApp({ state, onBack }) {
   const activityRows = Object.entries(normalizeActivityHistory(state.activityHistory).activities)
     .sort((a, b) => (b[1].total || 0) - (a[1].total || 0))
     .slice(0, 5);
+  const testRows = Object.values(state.academicTests?.completed || {})
+    .sort((a, b) => absoluteMoment(b.day, b.slot) - absoluteMoment(a.day, a.slot))
+    .slice(0, 5);
   const StatRow = ({ label, value, max = 100 }) => (
     <div style={{ marginBottom: 10 }}>
       <div style={{
@@ -3552,6 +3872,35 @@ function SelfApp({ state, onBack }) {
           </div>
         ) : (
           <span style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No repeated patterns yet.</span>
+        )}
+      </div>
+      <div style={{ marginTop: 18 }}>
+        <div style={{
+          fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase",
+          color: "#8b6f3d", fontWeight: 600, marginBottom: 8,
+        }}>Academic Records</div>
+        {testRows.length ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {testRows.map(test => (
+              <div key={test.id} style={{
+                padding: "8px 9px",
+                border: "1px solid rgba(58,53,48,0.08)",
+                borderRadius: 8,
+                background: "rgba(58,53,48,0.03)",
+                fontSize: 11,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", gap: 8 }}>
+                  <span style={{ fontWeight: 700 }}>{test.title}</span>
+                  <span style={{ color: "#8b6f3d", fontWeight: 800 }}>{test.score}%</span>
+                </div>
+                <div style={{ color: "#7a6e58", marginTop: 3 }}>
+                  {test.grade} · {test.difficulty} puzzle · prep {test.prepScore}/100 · {formatMoment(test.day, test.slot)}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No tests completed yet.</span>
         )}
       </div>
     </AppShell>
