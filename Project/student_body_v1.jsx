@@ -261,6 +261,40 @@ function normalizeState(state) {
 const TIME_LABELS = ["Morning", "Midday", "Afternoon", "Evening", "Night"];
 const DAY_LABELS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const NARRATOR_EVENT_LIMIT = 10;
+const SEMESTER_WEEKS = 16;
+
+const PLAYER_WEEKLY_SCHEDULE = [
+  { id: "first_year_seminar", title: "First-Year Seminar", kind: "class", location: "lecture_hall", days: [0, 2], slots: [0], required: true },
+  { id: "intro_psych", title: "Intro Psych", kind: "class", location: "lecture_hall", days: [1, 3], slots: [0], required: true },
+  { id: "writing_lab", title: "Writing Lab", kind: "class", location: "lecture_hall", days: [4], slots: [1], required: true },
+  { id: "advising_checkin", title: "Advising Check-in", kind: "campus", location: "student_union", days: [0], slots: [1], required: false },
+];
+
+const SEMESTER_CALENDAR_EVENTS = [
+  { id: "orientation_mixer", title: "Orientation Mixer", kind: "event", location: "student_union", week: 1, dayIndex: 0, slot: 3 },
+  { id: "club_fair", title: "Club Fair", kind: "event", location: "quad", week: 1, dayIndex: 2, slot: 2 },
+  { id: "first_library_workshop", title: "Library Research Workshop", kind: "event", location: "library_main", week: 1, dayIndex: 3, slot: 2 },
+  { id: "first_midterm", title: "First Midterm", kind: "exam", location: "lecture_hall", week: 8, dayIndex: 2, slot: 0 },
+  { id: "finals_week_begins", title: "Finals Week Begins", kind: "exam", location: "lecture_hall", week: 16, dayIndex: 0, slot: 0 },
+];
+
+const NPC_WEEKLY_SCHEDULES = {
+  studious: [
+    { days: [0, 1, 2, 3, 4, 5], slots: [0, 1, 2], location: "coffee_shop", note: "on shift" },
+    { days: [1, 3], slots: [3], location: "library_main", note: "community college coursework" },
+    { days: [2], slots: [4], location: "library_stacks", note: "late research hour" },
+    { days: [6], slots: [0], location: "running_trail", note: "quiet morning run" },
+    { days: [5], slots: [3], location: "bookstore", note: "browsing after work" },
+  ],
+  roommate: [
+    { days: [0, 2, 4], slots: [0], location: "lecture_hall", note: "morning class" },
+    { days: [0, 1, 2, 3, 4], slots: [1], location: "student_union", note: "between classes" },
+    { days: [1, 3], slots: [2], location: "gym", note: "workout" },
+    { days: [2], slots: [3], location: "library_main", note: "study group" },
+    { days: [5], slots: [2], location: "quad", note: "pickup plans" },
+    { days: [0, 1, 2, 3, 4, 5, 6], slots: [4], location: "dorm_room", note: "back in the room" },
+  ],
+};
 
 function advanceTime(state, n = 1) {
   let day = state.day;
@@ -273,6 +307,117 @@ function appendEvent(state, text, witnesses = []) {
   const event = { day: state.day, slot: state.timeSlot, text };
   if (witnesses.length) event.witnesses = witnesses;
   return { ...state, eventLog: [...state.eventLog, event] };
+}
+
+function getWeekNumber(day = 1) {
+  return Math.max(1, Math.min(SEMESTER_WEEKS, Math.floor((day - 1) / DAY_LABELS.length) + 1));
+}
+
+function getDayIndex(day = 1) {
+  return ((day - 1) % DAY_LABELS.length + DAY_LABELS.length) % DAY_LABELS.length;
+}
+
+function getCalendarMoment(state, overrides = {}) {
+  const day = overrides.day ?? state?.day ?? 1;
+  const slot = overrides.slot ?? state?.timeSlot ?? 0;
+  return {
+    day,
+    slot,
+    week: getWeekNumber(day),
+    dayIndex: getDayIndex(day),
+    dayName: DAY_LABELS[getDayIndex(day)],
+    slotLabel: TIME_LABELS[slot] || `Slot ${slot}`,
+  };
+}
+
+function scheduleMatchesMoment(entry, moment) {
+  if (!entry) return false;
+  if (entry.days && !entry.days.includes(moment.dayIndex)) return false;
+  if (entry.slots && !entry.slots.includes(moment.slot)) return false;
+  if (entry.week && entry.week !== moment.week) return false;
+  if (entry.weeks && !entry.weeks.includes(moment.week)) return false;
+  if (entry.fromWeek && moment.week < entry.fromWeek) return false;
+  if (entry.untilWeek && moment.week > entry.untilWeek) return false;
+  return true;
+}
+
+function expandWeeklyScheduleForDay(entries, state, day = state.day) {
+  const dayMoment = getCalendarMoment(state, { day, slot: 0 });
+  return entries.flatMap(entry => {
+    if (entry.days && !entry.days.includes(dayMoment.dayIndex)) return [];
+    if (entry.week && entry.week !== dayMoment.week) return [];
+    if (entry.weeks && !entry.weeks.includes(dayMoment.week)) return [];
+    if (entry.fromWeek && dayMoment.week < entry.fromWeek) return [];
+    if (entry.untilWeek && dayMoment.week > entry.untilWeek) return [];
+    return (entry.slots || [entry.slot ?? 0]).map(slot => ({
+      ...entry,
+      day,
+      week: dayMoment.week,
+      dayIndex: dayMoment.dayIndex,
+      slot,
+    }));
+  });
+}
+
+function getFixedCalendarItemsForDay(state, day = state.day) {
+  const dayMoment = getCalendarMoment(state, { day, slot: 0 });
+  return SEMESTER_CALENDAR_EVENTS
+    .filter(item => item.week === dayMoment.week && item.dayIndex === dayMoment.dayIndex)
+    .map(item => ({ ...item, day, slot: item.slot }));
+}
+
+function getTodayCalendarItems(state, day = state.day) {
+  return [
+    ...expandWeeklyScheduleForDay(PLAYER_WEEKLY_SCHEDULE, state, day),
+    ...getFixedCalendarItemsForDay(state, day),
+  ].sort((a, b) => a.slot - b.slot || String(a.title).localeCompare(String(b.title)));
+}
+
+function getCurrentCalendarItems(state) {
+  const moment = getCalendarMoment(state);
+  return getTodayCalendarItems(state, moment.day).filter(item => item.slot === moment.slot);
+}
+
+function getCalendarItemsAtLocation(state, locationKey, slot = state.timeSlot, day = state.day) {
+  return getTodayCalendarItems(state, day).filter(item => item.location === locationKey && item.slot === slot);
+}
+
+function getUpcomingCalendarItems(state, limit = 5) {
+  const items = [];
+  for (let offset = 0; offset < 7 && items.length < limit; offset += 1) {
+    const day = state.day + offset;
+    const startSlot = offset === 0 ? state.timeSlot : 0;
+    const dayItems = getTodayCalendarItems(state, day).filter(item => item.slot >= startSlot);
+    items.push(...dayItems.map(item => ({ ...item, day })));
+  }
+  return items
+    .sort((a, b) => (a.day - b.day) || (a.slot - b.slot))
+    .slice(0, limit);
+}
+
+function getNpcScheduleMatches(state, npc, locationKey = null) {
+  if (!npc) return [];
+  const moment = getCalendarMoment(state);
+  const npcId = npc.id || npc.portraitKey || npc.name;
+  const schedule = state?.npcSchedules?.[npcId] || NPC_WEEKLY_SCHEDULES[npcId] || [];
+  return schedule.filter(entry => (
+    scheduleMatchesMoment(entry, moment) &&
+    (!locationKey || entry.location === locationKey)
+  ));
+}
+
+function getNpcPresenceAtLocation(state, locationKey, directory = getNpcDirectory(state)) {
+  return Object.values(directory)
+    .map(npc => {
+      const match = getNpcScheduleMatches(state, npc, locationKey)[0];
+      return match ? { ...npc, currentLocation: locationKey, scheduleNote: match.note, scheduleEntry: match } : null;
+    })
+    .filter(Boolean);
+}
+
+function describeScheduleItem(item) {
+  const place = LOCATIONS[item.location]?.label || item.location;
+  return `${TIME_LABELS[item.slot] || `Slot ${item.slot}`}: ${item.title} at ${place}`;
 }
 
 // Scene-context assembler helpers. These accept today's lightweight prototype
@@ -361,13 +506,14 @@ function getPresentNpcs(state, directory) {
 
   if (explicitNpcs) return explicitNpcs;
 
+  const scheduledNpcs = getNpcPresenceAtLocation(state, locationKey, directory);
+  if (scheduledNpcs.length) return scheduledNpcs;
+
   const locatedNpcs = Object.values(directory).filter(npc => (
     npc.currentLocation === locationKey || npc.location === locationKey
   ));
   if (locatedNpcs.length) return locatedNpcs;
 
-  if (locationKey === "coffee_shop") return [directory.studious];
-  if (locationKey === "dorm_room" && state?.introSeen) return [directory.roommate];
   return [];
 }
 
@@ -507,6 +653,10 @@ function buildNarratorContext(state, action) {
   const locationDescription = LOCATION_DESCRIPTIONS[locationKey] || "No static description recorded yet.";
   const npcDirectory = getNpcDirectory(state);
   const presentNpcs = getPresentNpcs(state, npcDirectory).filter(Boolean);
+  const currentCalendarItems = getCurrentCalendarItems(state);
+  const currentCalendarText = currentCalendarItems.length
+    ? currentCalendarItems.map(describeScheduleItem).join("; ")
+    : "Free block; no required calendar item in this slot.";
   const actionText = typeof action === "string"
     ? action.trim()
     : (action?.label || action?.text || action?.description || "");
@@ -533,6 +683,7 @@ function buildNarratorContext(state, action) {
       portraitKey: npc.portraitKey,
       schema: stripNpcSchemaNoise(npc),
       currentMood: getNpcMood(state, npc),
+      scheduleNote: npc.scheduleNote || null,
       lastSeenDisposition: relationship.lastSeenDisposition || npc.lastSeenDisposition || "No prior disposition recorded.",
       relationshipToPlayer: {
         score: relationship.score,
@@ -559,6 +710,7 @@ function buildNarratorContext(state, action) {
     "# Scene",
     `Week ${week}, ${dayName} (semester day ${day}), ${timeSlot}`,
     `Location: ${location.label || locationKey} [${locationKey}] - ${locationDescription}`,
+    `Calendar: ${currentCalendarText}`,
     `Player action: ${actionText || "[arrived at location]"}`,
     "",
     "# Player State",
@@ -1336,6 +1488,7 @@ function FloatingIcons({ phoneOpen, onTogglePhone }) {
 }
 
 function HeaderBar({ state, onNewGame }) {
+  const moment = getCalendarMoment(state);
   return (
     <div style={{
       position: "absolute", top: 16, left: 16, zIndex: 30,
@@ -1346,9 +1499,11 @@ function HeaderBar({ state, onNewGame }) {
       fontFamily: "Georgia, serif", letterSpacing: 0.3,
       backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)",
     }}>
-      <span style={{ color: PAL.accent }}>Day {state.day}</span>
+      <span style={{ color: PAL.accent }}>Week {moment.week}</span>
       <span style={{ color: PAL.inkSoft }}>·</span>
-      <span style={{ color: PAL.inkDim }}>{TIME_LABELS[state.timeSlot]}</span>
+      <span style={{ color: PAL.inkDim }}>{moment.dayName}</span>
+      <span style={{ color: PAL.inkSoft }}>·</span>
+      <span style={{ color: PAL.inkDim }}>{moment.slotLabel}</span>
       <span style={{ color: PAL.inkSoft }}>·</span>
       <span style={{ color: PAL.inkDim }}>{LOCATIONS[state.location]?.label || state.location}</span>
       <button
@@ -1664,6 +1819,7 @@ function CompassApp({ state, onBack, onNavigate }) {
     { label: "Outdoor", cat: "outdoor" },
   ];
   const here = state.location;
+  const directory = getNpcDirectory(state);
 
   return (
     <AppShell title="Compass" onBack={onBack} dark>
@@ -1690,6 +1846,9 @@ function CompassApp({ state, onBack, onNavigate }) {
               }}>
                 {locs.map(([key, v]) => {
                   const isHere = key === here;
+                  const npcHits = getNpcPresenceAtLocation(state, key, directory);
+                  const calendarHits = getCalendarItemsAtLocation(state, key);
+                  const hasIndicators = npcHits.length > 0 || calendarHits.length > 0;
                   return (
                     <button
                       key={key}
@@ -1704,11 +1863,56 @@ function CompassApp({ state, onBack, onNavigate }) {
                         color: isHere ? "#c8a165" : "#f0ebdc",
                         cursor: isHere ? "default" : "pointer",
                         fontSize: 12, fontFamily: "system-ui, sans-serif",
-                        display: "flex", justifyContent: "space-between", alignItems: "center",
+                        display: "block",
+                        minHeight: hasIndicators ? 58 : 34,
                       }}
                     >
-                      <span>{v.label}</span>
-                      {isHere && <span style={{ fontSize: 9, opacity: 0.7 }}>here</span>}
+                      <span style={{ display: "flex", justifyContent: "space-between", gap: 8, alignItems: "center" }}>
+                        <span>{v.label}</span>
+                        {isHere && <span style={{ fontSize: 9, opacity: 0.7 }}>here</span>}
+                      </span>
+                      {hasIndicators && (
+                        <span style={{
+                          display: "flex",
+                          flexWrap: "wrap",
+                          gap: 4,
+                          marginTop: 6,
+                        }}>
+                          {calendarHits.map(item => (
+                            <span key={`${item.id}-${item.slot}`} title={describeScheduleItem(item)} style={{
+                              maxWidth: "100%",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              padding: "2px 5px",
+                              borderRadius: 999,
+                              background: item.required ? "rgba(96,165,250,0.22)" : "rgba(200,161,101,0.18)",
+                              color: item.required ? "#bfdbfe" : "#c8a165",
+                              fontSize: 9,
+                            }}>
+                              {item.required ? "Class" : item.title}
+                            </span>
+                          ))}
+                          {npcHits.slice(0, 2).map(npc => (
+                            <span key={npc.id} title={npc.scheduleNote || "scheduled here"} style={{
+                              maxWidth: "100%",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: "nowrap",
+                              padding: "2px 5px",
+                              borderRadius: 999,
+                              background: "rgba(240,235,220,0.10)",
+                              color: "#f0ebdc",
+                              fontSize: 9,
+                            }}>
+                              {npc.name || npc.id}
+                            </span>
+                          ))}
+                          {npcHits.length > 2 && (
+                            <span style={{ color: "rgba(240,235,220,0.62)", fontSize: 9 }}>+{npcHits.length - 2}</span>
+                          )}
+                        </span>
+                      )}
                     </button>
                   );
                 })}
@@ -1997,17 +2201,53 @@ function AnthropApp({ state, onBack }) {
   const strong = statEntries.slice().sort((a, b) => b[1] - a[1])[0]?.[0] || "charm";
   const recentEvents = (state.eventLog || []).slice(-5).reverse();
   const relationshipEntries = Object.entries(state.player.relationships || {});
+  const moment = getCalendarMoment(state);
+  const currentCalendarItems = getCurrentCalendarItems(state);
+  const upcomingItems = getUpcomingCalendarItems(state, 5);
+  const presentHere = getNpcPresenceAtLocation(state, state.location, getNpcDirectory(state));
 
   return (
     <AppShell title="Anthrop" onBack={onBack} dark>
       <PhoneSection title="Readout" dark>
         <p style={{ margin: "0 0 8px", color: "#f0ebdc", fontSize: 13, lineHeight: 1.45 }}>
-          Week {Math.floor((state.day - 1) / 7) + 1}, currently at {LOCATIONS[state.location]?.label || state.location}.
+          Week {moment.week}, {moment.dayName} {moment.slotLabel}, currently at {LOCATIONS[state.location]?.label || state.location}.
           Your strongest stat is {STAT_LABELS[strong] || strong} and the easiest gain right now is probably {STAT_LABELS[weak] || weak}.
         </p>
         <p style={{ margin: 0, color: "rgba(240,235,220,0.72)", fontSize: 12 }}>
           Energy is {state.player.resources.energy}/100 and money is ${state.player.resources.money}.
         </p>
+      </PhoneSection>
+      <PhoneSection title="Calendar" dark>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div>
+            <div style={{ color: "#c8a165", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Now</div>
+            {currentCalendarItems.length ? currentCalendarItems.map(item => (
+              <p key={`${item.id}-${item.slot}`} style={{ margin: "0 0 5px", color: "#f0ebdc", fontSize: 12, lineHeight: 1.35 }}>
+                {item.title} at {LOCATIONS[item.location]?.label || item.location}
+              </p>
+            )) : (
+              <p style={{ margin: 0, color: "rgba(240,235,220,0.58)", fontSize: 12 }}>Free block.</p>
+            )}
+            <div style={{ color: "#c8a165", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", margin: "10px 0 5px" }}>Likely Here</div>
+            {presentHere.length ? (
+              <p style={{ margin: 0, color: "#f0ebdc", fontSize: 12, lineHeight: 1.35 }}>
+                {presentHere.map(npc => `${npc.name || npc.id}${npc.scheduleNote ? ` (${npc.scheduleNote})` : ""}`).join(", ")}
+              </p>
+            ) : (
+              <p style={{ margin: 0, color: "rgba(240,235,220,0.58)", fontSize: 12 }}>No named NPCs scheduled here.</p>
+            )}
+          </div>
+          <div>
+            <div style={{ color: "#c8a165", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Next Up</div>
+            {upcomingItems.length ? upcomingItems.map(item => (
+              <TimelineItem dark when={formatMoment(item.day, item.slot)} key={`${item.id}-${item.day}-${item.slot}`}>
+                {item.title} at {LOCATIONS[item.location]?.label || item.location}
+              </TimelineItem>
+            )) : (
+              <p style={{ margin: 0, color: "rgba(240,235,220,0.58)", fontSize: 12 }}>Nothing scheduled soon.</p>
+            )}
+          </div>
+        </div>
       </PhoneSection>
       <PhoneSection title="Suggestions" dark>
         <ul style={{ margin: 0, paddingLeft: 18, color: "#f0ebdc", fontSize: 12, lineHeight: 1.55 }}>
