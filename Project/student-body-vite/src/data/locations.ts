@@ -1,7 +1,57 @@
 import type { LocationDefinition, LocationId } from "../types/game";
 
-export const TIME_LABELS = ["Morning", "Midday", "Afternoon", "Evening", "Night"] as const;
 export const DAY_LABELS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"] as const;
+export const TIME_CHUNK_MINUTES = 15;
+export const CHUNKS_PER_DAY = 24 * 60 / TIME_CHUNK_MINUTES;
+export const DEFAULT_ACTION_CHUNKS = 4;
+
+export function timeChunk(hour: number, minute = 0) {
+  if (hour >= 24) return CHUNKS_PER_DAY;
+  const totalMinutes = Math.max(0, Math.min(24 * 60 - TIME_CHUNK_MINUTES, hour * 60 + minute));
+  return Math.floor(totalMinutes / TIME_CHUNK_MINUTES);
+}
+
+export const LEGACY_SLOT_TO_CHUNK = [timeChunk(8), timeChunk(12), timeChunk(15), timeChunk(18), timeChunk(22)];
+
+export function normalizeTimeSlot(slot: number | string | undefined, legacyScale = false) {
+  const raw = typeof slot === "number" ? slot : Number(slot);
+  if (!Number.isFinite(raw)) return timeChunk(8);
+  if (legacyScale && raw >= 0 && raw < LEGACY_SLOT_TO_CHUNK.length) return LEGACY_SLOT_TO_CHUNK[raw];
+  return Math.max(0, Math.min(CHUNKS_PER_DAY - 1, Math.round(raw)));
+}
+
+export function formatClockTime(slot = 0) {
+  const safeSlot = Math.max(0, Math.min(CHUNKS_PER_DAY, Math.round(Number(slot) || 0)));
+  const totalMinutes = safeSlot * TIME_CHUNK_MINUTES;
+  const hours24 = Math.floor(totalMinutes / 60) % 24;
+  const minutes = totalMinutes % 60;
+  const suffix = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 || 12;
+  return `${hours12}:${String(minutes).padStart(2, "0")} ${suffix}`;
+}
+
+export function getDaypartLabel(slot = 0) {
+  const totalMinutes = normalizeTimeSlot(slot) * TIME_CHUNK_MINUTES;
+  if (totalMinutes < 5 * 60) return "Late Night";
+  if (totalMinutes < 12 * 60) return "Morning";
+  if (totalMinutes < 17 * 60) return "Afternoon";
+  if (totalMinutes < 21 * 60) return "Evening";
+  return "Night";
+}
+
+export function formatTimeOfDay(slot = 0) {
+  return `${formatClockTime(slot)} (${getDaypartLabel(slot)})`;
+}
+
+export function formatDuration(chunks = 0) {
+  const minutes = Math.max(0, Math.round(chunks * TIME_CHUNK_MINUTES));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+
+export const TIME_LABELS = Array.from({ length: CHUNKS_PER_DAY }, (_, slot) => formatTimeOfDay(slot));
 
 export const LOCATIONS: Record<LocationId, LocationDefinition> = {
   dorm_room: {

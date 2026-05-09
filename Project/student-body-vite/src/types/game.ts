@@ -1,5 +1,5 @@
 export type StatKey = "charm" | "sensitivity" | "knowledge" | "athletics" | "grit";
-export type TimeSlotIndex = 0 | 1 | 2 | 3 | 4;
+export type TimeSlotIndex = number;
 export type LocationCategory = "campus" | "town" | "outdoor";
 
 export type LocationId = string;
@@ -115,7 +115,8 @@ export interface Scene {
 }
 
 export interface GameState {
-  version: 1;
+  version: number;
+  timeScale?: "quarter-hour";
   day: number;
   timeSlot: TimeSlotIndex;
   location: LocationId;

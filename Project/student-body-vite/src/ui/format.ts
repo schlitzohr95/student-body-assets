@@ -1,10 +1,10 @@
-import { DAY_LABELS, TIME_LABELS } from "../data/locations";
+import { DAY_LABELS, formatTimeOfDay } from "../data/locations";
 import type { GameEvent, GameNote } from "../types/game";
 
 export function formatMoment(day = 1, slot: number | string = 0) {
   const week = Math.floor((day - 1) / 7) + 1;
   const dayName = DAY_LABELS[(day - 1) % DAY_LABELS.length];
-  const slotLabel = typeof slot === "number" ? TIME_LABELS[slot] || `Slot ${slot}` : slot;
+  const slotLabel = typeof slot === "number" ? formatTimeOfDay(slot) : slot;
   return `W${week} ${dayName} ${slotLabel}`;
 }
 

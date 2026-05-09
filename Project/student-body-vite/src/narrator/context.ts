@@ -1,4 +1,4 @@
-import { DAY_LABELS, LOCATIONS, TIME_LABELS } from "../data/locations";
+import { DAY_LABELS, formatTimeOfDay, LOCATIONS } from "../data/locations";
 import { STARTER_NPCS } from "../data/npcs";
 import type { GameEvent, GameState, Npc } from "../types/game";
 
@@ -123,7 +123,7 @@ function formatEventForNarrator(event: GameEvent): string {
   const week = event.week ?? (typeof day === "number" ? Math.floor((day - 1) / 7) + 1 : undefined);
   const dayName = typeof day === "number" ? DAY_LABELS[(day - 1) % DAY_LABELS.length] : event.dayName;
   const rawSlot = event.slot ?? event.timeSlot;
-  const slot = typeof rawSlot === "number" ? TIME_LABELS[rawSlot] || `Slot ${rawSlot}` : rawSlot;
+  const slot = typeof rawSlot === "number" ? formatTimeOfDay(rawSlot) : rawSlot;
   const when = [week ? `Week ${week}` : null, dayName || (day ? `Day ${day}` : null), slot].filter(Boolean).join(", ");
   const witnesses = normalizeWitnessIds(event);
   const witnessText = witnesses.length ? ` (witnesses: ${witnesses.join(", ")})` : "";
@@ -133,7 +133,7 @@ function formatEventForNarrator(event: GameEvent): string {
 export function buildNarratorContext(state: GameState, action?: string | { label?: string; text?: string; description?: string }): string {
   const week = Math.floor((state.day - 1) / 7) + 1;
   const dayName = DAY_LABELS[(state.day - 1) % DAY_LABELS.length];
-  const timeSlot = TIME_LABELS[state.timeSlot] || `Slot ${state.timeSlot}`;
+  const timeSlot = formatTimeOfDay(state.timeSlot);
   const location = LOCATIONS[state.location] || { id: state.location, label: state.location, description: "No static description recorded yet." };
   const npcDirectory = getNpcDirectory(state);
   const presentNpcs = getPresentNpcs(state, npcDirectory);

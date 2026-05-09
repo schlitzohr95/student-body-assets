@@ -1,11 +1,12 @@
 import type { GameEvent, GameState, TimeSlotIndex } from "../types/game";
-import { TIME_LABELS } from "../data/locations";
+import { CHUNKS_PER_DAY, DEFAULT_ACTION_CHUNKS, normalizeTimeSlot, timeChunk } from "../data/locations";
 
 export function makeFreshState(): GameState {
   return {
-    version: 1,
+    version: 2,
+    timeScale: "quarter-hour",
     day: 1,
-    timeSlot: 1,
+    timeSlot: timeChunk(8),
     location: "dorm_room",
     introSeen: false,
     metMari: false,
@@ -23,11 +24,23 @@ export function makeFreshState(): GameState {
   };
 }
 
+function migrateTimedRecords<T extends { slot?: number | string }>(records: T[] | undefined, legacyScale: boolean): T[] {
+  if (!Array.isArray(records)) return [];
+  return records.map(record => {
+    if (!record || typeof record.slot !== "number") return record;
+    return { ...record, slot: normalizeTimeSlot(record.slot, legacyScale) };
+  });
+}
+
 export function normalizeState(state: GameState): GameState {
   const fresh = makeFreshState();
+  const legacyTimeScale = state.timeScale !== "quarter-hour" && (state.version || 1) < 2;
   return {
     ...fresh,
     ...state,
+    version: 2,
+    timeScale: "quarter-hour",
+    timeSlot: normalizeTimeSlot(state.timeSlot, legacyTimeScale) as TimeSlotIndex,
     player: {
       ...fresh.player,
       ...state.player,
@@ -37,18 +50,22 @@ export function normalizeState(state: GameState): GameState {
       relationships: state.player?.relationships || {},
     },
     npcsKnown: state.npcsKnown || [],
-    eventLog: state.eventLog || [],
-    messages: state.messages || [],
-    notes: state.notes || [],
+    eventLog: migrateTimedRecords(state.eventLog, legacyTimeScale),
+    messages: migrateTimedRecords(state.messages, legacyTimeScale),
+    notes: migrateTimedRecords(state.notes, legacyTimeScale),
   };
 }
 
-export function advanceTime(state: GameState, amount = 1): GameState {
+export function advanceTime(state: GameState, amount = DEFAULT_ACTION_CHUNKS): GameState {
   let day = state.day;
-  let slot = state.timeSlot + amount;
-  while (slot >= TIME_LABELS.length) {
-    slot -= TIME_LABELS.length;
+  let slot = normalizeTimeSlot(state.timeSlot) + amount;
+  while (slot >= CHUNKS_PER_DAY) {
+    slot -= CHUNKS_PER_DAY;
     day += 1;
+  }
+  while (slot < 0) {
+    slot += CHUNKS_PER_DAY;
+    day -= 1;
   }
 
   return { ...state, day, timeSlot: slot as TimeSlotIndex };

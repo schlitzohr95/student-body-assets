@@ -215,9 +215,10 @@ const APP_BY_ID = Object.fromEntries(APPS.map(a => [a.id, a]));
 
 function makeFreshState() {
   return {
-    version: 1,
+    version: 2,
+    timeScale: "quarter-hour",
     day: 1,
-    timeSlot: 1, // 0=morning, 1=midday, 2=afternoon, 3=evening, 4=night
+    timeSlot: timeChunk(8), // 15-minute chunk index; 8:00 AM
     location: "dorm_room",
     introSeen: false,
     metMari: false,
@@ -240,9 +241,13 @@ function normalizeState(state) {
   if (!state || typeof state !== "object") return fresh;
 
   const player = state.player || {};
+  const legacyTimeScale = state.timeScale !== "quarter-hour" && (state.version || 1) < 2;
   return {
     ...fresh,
     ...state,
+    version: 2,
+    timeScale: "quarter-hour",
+    timeSlot: normalizeTimeSlot(state.timeSlot, legacyTimeScale),
     player: {
       ...fresh.player,
       ...player,
@@ -252,54 +257,110 @@ function normalizeState(state) {
       relationships: player.relationships || {},
     },
     npcsKnown: Array.isArray(state.npcsKnown) ? state.npcsKnown : [],
-    messages: Array.isArray(state.messages) ? state.messages : [],
-    notes: Array.isArray(state.notes) ? state.notes : [],
-    eventLog: Array.isArray(state.eventLog) ? state.eventLog : [],
+    messages: migrateTimedRecords(state.messages, legacyTimeScale),
+    notes: migrateTimedRecords(state.notes, legacyTimeScale),
+    eventLog: migrateTimedRecords(state.eventLog, legacyTimeScale),
   };
 }
 
-const TIME_LABELS = ["Morning", "Midday", "Afternoon", "Evening", "Night"];
 const DAY_LABELS = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"];
 const NARRATOR_EVENT_LIMIT = 10;
 const SEMESTER_WEEKS = 16;
+const TIME_CHUNK_MINUTES = 15;
+const CHUNKS_PER_DAY = 24 * 60 / TIME_CHUNK_MINUTES;
+const LEGACY_SLOT_TO_CHUNK = [timeChunk(8), timeChunk(12), timeChunk(15), timeChunk(18), timeChunk(22)];
+const DEFAULT_ACTION_CHUNKS = 4; // one hour
 
 const PLAYER_WEEKLY_SCHEDULE = [
-  { id: "first_year_seminar", title: "First-Year Seminar", kind: "class", location: "lecture_hall", days: [0, 2], slots: [0], required: true },
-  { id: "intro_psych", title: "Intro Psych", kind: "class", location: "lecture_hall", days: [1, 3], slots: [0], required: true },
-  { id: "writing_lab", title: "Writing Lab", kind: "class", location: "lecture_hall", days: [4], slots: [1], required: true },
-  { id: "advising_checkin", title: "Advising Check-in", kind: "campus", location: "student_union", days: [0], slots: [1], required: false },
+  { id: "first_year_seminar", title: "First-Year Seminar", kind: "class", location: "lecture_hall", days: [0, 2], start: timeChunk(9), end: timeChunk(10, 15), required: true },
+  { id: "intro_psych", title: "Intro Psych", kind: "class", location: "lecture_hall", days: [1, 3], start: timeChunk(9, 30), end: timeChunk(10, 45), required: true },
+  { id: "writing_lab", title: "Writing Lab", kind: "class", location: "lecture_hall", days: [4], start: timeChunk(11), end: timeChunk(12, 15), required: true },
+  { id: "advising_checkin", title: "Advising Check-in", kind: "campus", location: "student_union", days: [0], start: timeChunk(13), end: timeChunk(13, 30), required: false },
 ];
 
 const SEMESTER_CALENDAR_EVENTS = [
-  { id: "orientation_mixer", title: "Orientation Mixer", kind: "event", location: "student_union", week: 1, dayIndex: 0, slot: 3 },
-  { id: "club_fair", title: "Club Fair", kind: "event", location: "quad", week: 1, dayIndex: 2, slot: 2 },
-  { id: "first_library_workshop", title: "Library Research Workshop", kind: "event", location: "library_main", week: 1, dayIndex: 3, slot: 2 },
-  { id: "first_midterm", title: "First Midterm", kind: "exam", location: "lecture_hall", week: 8, dayIndex: 2, slot: 0 },
-  { id: "finals_week_begins", title: "Finals Week Begins", kind: "exam", location: "lecture_hall", week: 16, dayIndex: 0, slot: 0 },
+  { id: "orientation_mixer", title: "Orientation Mixer", kind: "event", location: "student_union", week: 1, dayIndex: 0, start: timeChunk(18), end: timeChunk(20) },
+  { id: "club_fair", title: "Club Fair", kind: "event", location: "quad", week: 1, dayIndex: 2, start: timeChunk(15), end: timeChunk(17) },
+  { id: "first_library_workshop", title: "Library Research Workshop", kind: "event", location: "library_main", week: 1, dayIndex: 3, start: timeChunk(15, 30), end: timeChunk(16, 30) },
+  { id: "first_midterm", title: "First Midterm", kind: "exam", location: "lecture_hall", week: 8, dayIndex: 2, start: timeChunk(9), end: timeChunk(10, 30) },
+  { id: "finals_week_begins", title: "Finals Week Begins", kind: "exam", location: "lecture_hall", week: 16, dayIndex: 0, start: timeChunk(9), end: timeChunk(10, 30) },
 ];
 
 const NPC_WEEKLY_SCHEDULES = {
   studious: [
-    { days: [0, 1, 2, 3, 4, 5], slots: [0, 1, 2], location: "coffee_shop", note: "on shift" },
-    { days: [1, 3], slots: [3], location: "library_main", note: "community college coursework" },
-    { days: [2], slots: [4], location: "library_stacks", note: "late research hour" },
-    { days: [6], slots: [0], location: "running_trail", note: "quiet morning run" },
-    { days: [5], slots: [3], location: "bookstore", note: "browsing after work" },
+    { days: [0, 1, 2, 3, 4, 5], start: timeChunk(7), end: timeChunk(14), location: "coffee_shop", note: "on shift" },
+    { days: [1, 3], start: timeChunk(18), end: timeChunk(20), location: "library_main", note: "community college coursework" },
+    { days: [2], start: timeChunk(21), end: timeChunk(22, 30), location: "library_stacks", note: "late research hour" },
+    { days: [6], start: timeChunk(8), end: timeChunk(9), location: "running_trail", note: "quiet morning run" },
+    { days: [5], start: timeChunk(17), end: timeChunk(18), location: "bookstore", note: "browsing after work" },
   ],
   roommate: [
-    { days: [0, 2, 4], slots: [0], location: "lecture_hall", note: "morning class" },
-    { days: [0, 1, 2, 3, 4], slots: [1], location: "student_union", note: "between classes" },
-    { days: [1, 3], slots: [2], location: "gym", note: "workout" },
-    { days: [2], slots: [3], location: "library_main", note: "study group" },
-    { days: [5], slots: [2], location: "quad", note: "pickup plans" },
-    { days: [0, 1, 2, 3, 4, 5, 6], slots: [4], location: "dorm_room", note: "back in the room" },
+    { days: [0, 2, 4], start: timeChunk(9), end: timeChunk(10, 15), location: "lecture_hall", note: "morning class" },
+    { days: [0, 1, 2, 3, 4], start: timeChunk(12), end: timeChunk(13, 30), location: "student_union", note: "between classes" },
+    { days: [1, 3], start: timeChunk(15), end: timeChunk(16, 30), location: "gym", note: "workout" },
+    { days: [2], start: timeChunk(18), end: timeChunk(20), location: "library_main", note: "study group" },
+    { days: [5], start: timeChunk(15), end: timeChunk(16, 30), location: "quad", note: "pickup plans" },
+    { days: [0, 1, 2, 3, 4, 5, 6], start: timeChunk(21), end: timeChunk(24), location: "dorm_room", note: "back in the room" },
   ],
 };
 
-function advanceTime(state, n = 1) {
+function timeChunk(hour, minute = 0) {
+  if (hour >= 24) return CHUNKS_PER_DAY;
+  const totalMinutes = Math.max(0, Math.min((24 * 60) - TIME_CHUNK_MINUTES, (hour * 60) + minute));
+  return Math.floor(totalMinutes / TIME_CHUNK_MINUTES);
+}
+
+function normalizeTimeSlot(slot, legacyScale = false) {
+  const raw = typeof slot === "number" ? slot : Number(slot);
+  if (!Number.isFinite(raw)) return timeChunk(8);
+  if (legacyScale && raw >= 0 && raw < LEGACY_SLOT_TO_CHUNK.length) return LEGACY_SLOT_TO_CHUNK[raw];
+  return Math.max(0, Math.min(CHUNKS_PER_DAY - 1, Math.round(raw)));
+}
+
+function migrateTimedRecords(records, legacyScale) {
+  if (!Array.isArray(records)) return [];
+  return records.map(record => {
+    if (!record || typeof record !== "object" || typeof record.slot !== "number") return record;
+    return { ...record, slot: normalizeTimeSlot(record.slot, legacyScale) };
+  });
+}
+
+function formatClockTime(slot = 0) {
+  const safeSlot = Math.max(0, Math.min(CHUNKS_PER_DAY, Math.round(Number(slot) || 0)));
+  const totalMinutes = safeSlot * TIME_CHUNK_MINUTES;
+  const hours24 = Math.floor(totalMinutes / 60) % 24;
+  const minutes = totalMinutes % 60;
+  const suffix = hours24 >= 12 ? "PM" : "AM";
+  const hours12 = hours24 % 12 || 12;
+  return `${hours12}:${String(minutes).padStart(2, "0")} ${suffix}`;
+}
+
+function getDaypartLabel(slot = 0) {
+  const totalMinutes = normalizeTimeSlot(slot) * TIME_CHUNK_MINUTES;
+  if (totalMinutes < 5 * 60) return "Late Night";
+  if (totalMinutes < 12 * 60) return "Morning";
+  if (totalMinutes < 17 * 60) return "Afternoon";
+  if (totalMinutes < 21 * 60) return "Evening";
+  return "Night";
+}
+
+function formatTimeOfDay(slot = 0) {
+  return `${formatClockTime(slot)} (${getDaypartLabel(slot)})`;
+}
+
+function formatDuration(chunks = 0) {
+  const minutes = Math.max(0, Math.round(chunks * TIME_CHUNK_MINUTES));
+  if (minutes < 60) return `${minutes}m`;
+  const hours = Math.floor(minutes / 60);
+  const remainder = minutes % 60;
+  return remainder ? `${hours}h ${remainder}m` : `${hours}h`;
+}
+
+function advanceTime(state, n = DEFAULT_ACTION_CHUNKS) {
   let day = state.day;
-  let slot = state.timeSlot + n;
-  while (slot >= TIME_LABELS.length) { slot -= TIME_LABELS.length; day += 1; }
+  let slot = normalizeTimeSlot(state.timeSlot) + n;
+  while (slot >= CHUNKS_PER_DAY) { slot -= CHUNKS_PER_DAY; day += 1; }
+  while (slot < 0) { slot += CHUNKS_PER_DAY; day -= 1; }
   return { ...state, day, timeSlot: slot };
 }
 
@@ -319,14 +380,14 @@ function getDayIndex(day = 1) {
 
 function getCalendarMoment(state, overrides = {}) {
   const day = overrides.day ?? state?.day ?? 1;
-  const slot = overrides.slot ?? state?.timeSlot ?? 0;
+  const slot = normalizeTimeSlot(overrides.slot ?? state?.timeSlot ?? timeChunk(8));
   return {
     day,
     slot,
     week: getWeekNumber(day),
     dayIndex: getDayIndex(day),
     dayName: DAY_LABELS[getDayIndex(day)],
-    slotLabel: TIME_LABELS[slot] || `Slot ${slot}`,
+    slotLabel: formatTimeOfDay(slot),
   };
 }
 
@@ -334,6 +395,8 @@ function scheduleMatchesMoment(entry, moment) {
   if (!entry) return false;
   if (entry.days && !entry.days.includes(moment.dayIndex)) return false;
   if (entry.slots && !entry.slots.includes(moment.slot)) return false;
+  if (typeof entry.start === "number" && moment.slot < entry.start) return false;
+  if (typeof entry.end === "number" && moment.slot >= entry.end) return false;
   if (entry.week && entry.week !== moment.week) return false;
   if (entry.weeks && !entry.weeks.includes(moment.week)) return false;
   if (entry.fromWeek && moment.week < entry.fromWeek) return false;
@@ -349,12 +412,14 @@ function expandWeeklyScheduleForDay(entries, state, day = state.day) {
     if (entry.weeks && !entry.weeks.includes(dayMoment.week)) return [];
     if (entry.fromWeek && dayMoment.week < entry.fromWeek) return [];
     if (entry.untilWeek && dayMoment.week > entry.untilWeek) return [];
-    return (entry.slots || [entry.slot ?? 0]).map(slot => ({
+    const slots = entry.slots || [entry.start ?? entry.slot ?? 0];
+    return slots.map(slot => ({
       ...entry,
       day,
       week: dayMoment.week,
       dayIndex: dayMoment.dayIndex,
-      slot,
+      slot: normalizeTimeSlot(slot),
+      end: typeof entry.end === "number" ? entry.end : normalizeTimeSlot(slot) + 1,
     }));
   });
 }
@@ -363,7 +428,7 @@ function getFixedCalendarItemsForDay(state, day = state.day) {
   const dayMoment = getCalendarMoment(state, { day, slot: 0 });
   return SEMESTER_CALENDAR_EVENTS
     .filter(item => item.week === dayMoment.week && item.dayIndex === dayMoment.dayIndex)
-    .map(item => ({ ...item, day, slot: item.slot }));
+    .map(item => ({ ...item, day, slot: normalizeTimeSlot(item.start ?? item.slot ?? 0), end: item.end ?? normalizeTimeSlot(item.start ?? item.slot ?? 0) + 1 }));
 }
 
 function getTodayCalendarItems(state, day = state.day) {
@@ -375,19 +440,24 @@ function getTodayCalendarItems(state, day = state.day) {
 
 function getCurrentCalendarItems(state) {
   const moment = getCalendarMoment(state);
-  return getTodayCalendarItems(state, moment.day).filter(item => item.slot === moment.slot);
+  return getTodayCalendarItems(state, moment.day).filter(item => moment.slot >= item.slot && moment.slot < (item.end ?? item.slot + 1));
 }
 
 function getCalendarItemsAtLocation(state, locationKey, slot = state.timeSlot, day = state.day) {
-  return getTodayCalendarItems(state, day).filter(item => item.location === locationKey && item.slot === slot);
+  const currentSlot = normalizeTimeSlot(slot);
+  return getTodayCalendarItems(state, day).filter(item => (
+    item.location === locationKey &&
+    currentSlot >= item.slot &&
+    currentSlot < (item.end ?? item.slot + 1)
+  ));
 }
 
 function getUpcomingCalendarItems(state, limit = 5) {
   const items = [];
   for (let offset = 0; offset < 7 && items.length < limit; offset += 1) {
     const day = state.day + offset;
-    const startSlot = offset === 0 ? state.timeSlot : 0;
-    const dayItems = getTodayCalendarItems(state, day).filter(item => item.slot >= startSlot);
+    const startSlot = offset === 0 ? normalizeTimeSlot(state.timeSlot) : 0;
+    const dayItems = getTodayCalendarItems(state, day).filter(item => (item.end ?? item.slot + 1) > startSlot);
     items.push(...dayItems.map(item => ({ ...item, day })));
   }
   return items
@@ -417,7 +487,8 @@ function getNpcPresenceAtLocation(state, locationKey, directory = getNpcDirector
 
 function describeScheduleItem(item) {
   const place = LOCATIONS[item.location]?.label || item.location;
-  return `${TIME_LABELS[item.slot] || `Slot ${item.slot}`}: ${item.title} at ${place}`;
+  const end = typeof item.end === "number" ? `-${formatClockTime(item.end)}` : "";
+  return `${formatClockTime(item.slot)}${end}: ${item.title} at ${place}`;
 }
 
 // Scene-context assembler helpers. These accept today's lightweight prototype
@@ -631,7 +702,7 @@ function formatEventForNarrator(event) {
   const week = event.week ?? (typeof day === "number" ? Math.floor((day - 1) / 7) + 1 : undefined);
   const dayName = typeof day === "number" ? DAY_LABELS[(day - 1) % DAY_LABELS.length] : event.dayName;
   const rawSlot = event.slot ?? event.timeSlot;
-  const slot = typeof rawSlot === "number" ? (TIME_LABELS[rawSlot] || `Slot ${rawSlot}`) : rawSlot;
+  const slot = typeof rawSlot === "number" ? formatTimeOfDay(rawSlot) : rawSlot;
   const when = [
     week ? `Week ${week}` : null,
     dayName || (day ? `Day ${day}` : null),
@@ -647,7 +718,7 @@ function buildNarratorContext(state, action) {
   const week = state?.week || Math.floor((day - 1) / 7) + 1;
   const dayName = state?.dayName || DAY_LABELS[(day - 1) % DAY_LABELS.length];
   const rawTimeSlot = state?.timeSlot ?? state?.slot ?? 0;
-  const timeSlot = typeof rawTimeSlot === "number" ? (TIME_LABELS[rawTimeSlot] || `Slot ${rawTimeSlot}`) : rawTimeSlot;
+  const timeSlot = typeof rawTimeSlot === "number" ? formatTimeOfDay(rawTimeSlot) : rawTimeSlot;
   const locationKey = getLocationKey(state);
   const location = LOCATIONS[locationKey] || { label: locationKey };
   const locationDescription = LOCATION_DESCRIPTIONS[locationKey] || "No static description recorded yet.";
@@ -1010,7 +1081,7 @@ function formatMoment(day = 1, slot = 0) {
   const safeDay = typeof day === "number" && day > 0 ? day : 1;
   const week = Math.floor((safeDay - 1) / 7) + 1;
   const dayName = DAY_LABELS[(safeDay - 1) % DAY_LABELS.length];
-  const slotLabel = typeof slot === "number" ? (TIME_LABELS[slot] || `Slot ${slot}`) : slot;
+  const slotLabel = typeof slot === "number" ? formatTimeOfDay(slot) : slot;
   return `W${week} ${dayName} ${slotLabel}`;
 }
 
@@ -1103,15 +1174,54 @@ function applyActivityOutcome(state, choice) {
   return { state: next, notification };
 }
 
+function getChoiceDurationChunks(choice) {
+  const durations = {
+    go_coffee: 2,
+    explore: 4,
+    unpack: 6,
+    study_deep: 6,
+    browse_stacks: 4,
+    workout_weights: 6,
+    workout_cardio: 5,
+    trail_run: 4,
+    trail_walk: 4,
+    browse_flyers: 2,
+    people_watch: 4,
+    eat_meal: 3,
+    sit_with_strangers: 4,
+    browse_books: 4,
+    buy_supplies: 2,
+    review_notes: 6,
+    tidy_room: 4,
+    sit_window: 6,
+    chat_counter: 3,
+    rest: 8,
+    wait: 4,
+    leave: 1,
+  };
+  return durations[choice?.id] || DEFAULT_ACTION_CHUNKS;
+}
+
+function getTravelDurationChunks(fromLocation, toLocation) {
+  if (!fromLocation || !toLocation || fromLocation === toLocation) return 0;
+  const fromCat = LOCATIONS[fromLocation]?.cat;
+  const toCat = LOCATIONS[toLocation]?.cat;
+  if (fromCat === "campus" && toCat === "campus") return 1;
+  if (fromCat === toCat) return 2;
+  if ((fromCat === "campus" && toCat === "town") || (fromCat === "town" && toCat === "campus")) return 2;
+  return 3;
+}
+
 function navigateToLocation(state, locationKey) {
   if (state.location === locationKey) return { state };
   const destination = LOCATIONS[locationKey]?.label || locationKey;
-  const next = advanceTime(appendEvent(state, `Walked to ${destination}`), 1);
+  const travelChunks = getTravelDurationChunks(state.location, locationKey);
+  const next = advanceTime(appendEvent(state, `Walked to ${destination} (${formatDuration(travelChunks)})`), travelChunks);
   return { state: { ...next, location: locationKey } };
 }
 
 function applyChoice(state, choice) {
-  let next = advanceTime(appendEvent(state, `Chose: ${choice.label}`), 1);
+  let next = advanceTime(appendEvent(state, `Chose: ${choice.label}`), getChoiceDurationChunks(choice));
   let notification = null;
 
   if (choice.tag === "intro_complete") next = { ...next, introSeen: true };
@@ -1362,7 +1472,7 @@ function getScriptedScene(state) {
   }
 
   const loc = LOCATIONS[location];
-  const partOfDay = TIME_LABELS[timeSlot].toLowerCase();
+  const partOfDay = getDaypartLabel(timeSlot).toLowerCase();
   return {
     narration: `${loc?.label || "Here"}. ${partOfDay}, day ${day}. The semester keeps moving around you.`,
     choices: [
@@ -1678,7 +1788,7 @@ function PhoneFrame({ orientation, children, onClose }) {
 }
 
 function PhoneStatusBar({ state }) {
-  const time = `${TIME_LABELS[state.timeSlot]}`;
+  const time = formatClockTime(state.timeSlot);
   return (
     <div style={{
       padding: "10px 18px 6px",
@@ -1846,9 +1956,10 @@ function CompassApp({ state, onBack, onNavigate }) {
               }}>
                 {locs.map(([key, v]) => {
                   const isHere = key === here;
+                  const travelChunks = getTravelDurationChunks(here, key);
                   const npcHits = getNpcPresenceAtLocation(state, key, directory);
                   const calendarHits = getCalendarItemsAtLocation(state, key);
-                  const hasIndicators = npcHits.length > 0 || calendarHits.length > 0;
+                  const hasIndicators = npcHits.length > 0 || calendarHits.length > 0 || travelChunks > 0;
                   return (
                     <button
                       key={key}
@@ -1893,6 +2004,17 @@ function CompassApp({ state, onBack, onNavigate }) {
                               {item.required ? "Class" : item.title}
                             </span>
                           ))}
+                          {!isHere && travelChunks > 0 && (
+                            <span style={{
+                              padding: "2px 5px",
+                              borderRadius: 999,
+                              background: "rgba(56,189,248,0.14)",
+                              color: "#bae6fd",
+                              fontSize: 9,
+                            }}>
+                              {formatDuration(travelChunks)}
+                            </span>
+                          )}
                           {npcHits.slice(0, 2).map(npc => (
                             <span key={npc.id} title={npc.scheduleNote || "scheduled here"} style={{
                               maxWidth: "100%",

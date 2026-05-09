@@ -1,5 +1,5 @@
 import type { GameState, Scene } from "../types/game";
-import { LOCATIONS, TIME_LABELS } from "../data/locations";
+import { getDaypartLabel, LOCATIONS } from "../data/locations";
 
 export function getScriptedScene(state: GameState): Scene {
   const { location, day, timeSlot, metMari, introSeen } = state;
@@ -125,7 +125,7 @@ export function getScriptedScene(state: GameState): Scene {
   }
 
   const loc = LOCATIONS[location];
-  const partOfDay = TIME_LABELS[timeSlot].toLowerCase();
+  const partOfDay = getDaypartLabel(timeSlot).toLowerCase();
   return {
     narration: `${loc?.label || "Here"}. ${partOfDay}, day ${day}. The semester keeps moving around you.`,
     choices: [

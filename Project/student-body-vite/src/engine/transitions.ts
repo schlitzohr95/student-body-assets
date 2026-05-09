@@ -1,5 +1,5 @@
 import type { Choice, GameMessage, GameNote, GameState, GameUpdate, LocationId, NpcId, StatKey } from "../types/game";
-import { LOCATIONS } from "../data/locations";
+import { DEFAULT_ACTION_CHUNKS, formatDuration, LOCATIONS } from "../data/locations";
 import { STARTER_NPCS } from "../data/npcs";
 import { advanceTime, appendEvent } from "./state";
 
@@ -136,16 +136,55 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
   return { state: next, notification };
 }
 
+function getChoiceDurationChunks(choice: Choice) {
+  const durations: Record<string, number> = {
+    go_coffee: 2,
+    explore: 4,
+    unpack: 6,
+    study_deep: 6,
+    browse_stacks: 4,
+    workout_weights: 6,
+    workout_cardio: 5,
+    trail_run: 4,
+    trail_walk: 4,
+    browse_flyers: 2,
+    people_watch: 4,
+    eat_meal: 3,
+    sit_with_strangers: 4,
+    browse_books: 4,
+    buy_supplies: 2,
+    review_notes: 6,
+    tidy_room: 4,
+    sit_window: 6,
+    chat_counter: 3,
+    rest: 8,
+    wait: 4,
+    leave: 1,
+  };
+  return durations[choice.id] || DEFAULT_ACTION_CHUNKS;
+}
+
+function getTravelDurationChunks(fromLocation: LocationId, toLocation: LocationId) {
+  if (!fromLocation || !toLocation || fromLocation === toLocation) return 0;
+  const fromCat = LOCATIONS[fromLocation]?.cat;
+  const toCat = LOCATIONS[toLocation]?.cat;
+  if (fromCat === "campus" && toCat === "campus") return 1;
+  if (fromCat === toCat) return 2;
+  if ((fromCat === "campus" && toCat === "town") || (fromCat === "town" && toCat === "campus")) return 2;
+  return 3;
+}
+
 export function navigateToLocation(state: GameState, locationKey: LocationId): GameUpdate {
   if (state.location === locationKey) return { state };
 
   const destination = LOCATIONS[locationKey]?.label || locationKey;
-  const next = advanceTime(appendEvent(state, `Walked to ${destination}`), 1);
+  const travelChunks = getTravelDurationChunks(state.location, locationKey);
+  const next = advanceTime(appendEvent(state, `Walked to ${destination} (${formatDuration(travelChunks)})`), travelChunks);
   return { state: { ...next, location: locationKey } };
 }
 
 export function applyChoice(state: GameState, choice: Choice): GameUpdate {
-  let next = advanceTime(appendEvent(state, `Chose: ${choice.label}`), 1);
+  let next = advanceTime(appendEvent(state, `Chose: ${choice.label}`), getChoiceDurationChunks(choice));
   let notification: GameUpdate["notification"];
 
   if (choice.tag === "intro_complete") next = { ...next, introSeen: true };

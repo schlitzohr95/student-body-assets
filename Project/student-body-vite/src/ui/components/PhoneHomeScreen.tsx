@@ -1,6 +1,6 @@
 import { iconImageSrc } from "../../data/assets";
 import { APPS } from "../../data/apps";
-import { TIME_LABELS } from "../../data/locations";
+import { formatClockTime } from "../../data/locations";
 import type { GameState } from "../../types/game";
 
 interface PhoneHomeScreenProps {
@@ -12,7 +12,7 @@ export function PhoneHomeScreen({ state, onOpenApp }: PhoneHomeScreenProps) {
   return (
     <div className="phone-home">
       <div className="phone-status">
-        <span>{TIME_LABELS[state.timeSlot]}</span>
+        <span>{formatClockTime(state.timeSlot)}</span>
         <span className="phone-status__battery" />
       </div>
       <div className="phone-grid">
