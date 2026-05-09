@@ -195,13 +195,13 @@ const STARTER_NPCS = {
 
 const APPS = [
   { id: "compass", label: "Compass", role: "Navigation",  layout: "landscape", impl: true  },
-  { id: "pulse",   label: "Pulse",   role: "Messages",    layout: "portrait",  impl: false },
+  { id: "pulse",   label: "Pulse",   role: "Messages",    layout: "portrait",  impl: true  },
   { id: "roster",  label: "Roster",  role: "Contacts",    layout: "portrait",  impl: true  },
   { id: "self",    label: "Self",    role: "Stats",       layout: "portrait",  impl: true  },
-  { id: "buzz",    label: "Buzz",    role: "Campus feed", layout: "landscape", impl: false },
-  { id: "anthrop", label: "Anthrop", role: "Assistant",   layout: "landscape", impl: false },
+  { id: "buzz",    label: "Buzz",    role: "Campus feed", layout: "landscape", impl: true  },
+  { id: "anthrop", label: "Anthrop", role: "Assistant",   layout: "landscape", impl: true  },
   { id: "spark",   label: "Spark",   role: "Dating",      layout: "landscape", impl: false },
-  { id: "margin",  label: "Margin",  role: "Notes",       layout: "portrait",  impl: false },
+  { id: "margin",  label: "Margin",  role: "Notes",       layout: "portrait",  impl: true  },
   { id: "lens",    label: "Lens",    role: "Camera",      layout: "landscape", impl: false },
   { id: "wake",    label: "Wake",    role: "Alarm",       layout: "portrait",  impl: false },
   { id: "beacon",  label: "Beacon",  role: "Browser",     layout: "landscape", impl: false },
@@ -225,9 +225,36 @@ function makeFreshState() {
       name: "You",
       stats:    { knowledge: 30, athletics: 25, charm: 35, sensitivity: 40, grit: 30 },
       resources:{ energy: 80, money: 50 },
+      traits: [],
+      relationships: {},
     },
     npcsKnown: [], // list of portrait keys the player has met
+    messages: [],
+    notes: [],
     eventLog: [],
+  };
+}
+
+function normalizeState(state) {
+  const fresh = makeFreshState();
+  if (!state || typeof state !== "object") return fresh;
+
+  const player = state.player || {};
+  return {
+    ...fresh,
+    ...state,
+    player: {
+      ...fresh.player,
+      ...player,
+      stats: { ...fresh.player.stats, ...(player.stats || {}) },
+      resources: { ...fresh.player.resources, ...(player.resources || {}) },
+      traits: Array.isArray(player.traits) ? player.traits : [],
+      relationships: player.relationships || {},
+    },
+    npcsKnown: Array.isArray(state.npcsKnown) ? state.npcsKnown : [],
+    messages: Array.isArray(state.messages) ? state.messages : [],
+    notes: Array.isArray(state.notes) ? state.notes : [],
+    eventLog: Array.isArray(state.eventLog) ? state.eventLog : [],
   };
 }
 
@@ -743,6 +770,296 @@ async function requestNarratorScene(state, action, systemPrompt) {
 }
 
 // ============================================================================
+// DETERMINISTIC GAMEPLAY LOOP
+// ============================================================================
+//
+// These helpers keep the prototype playable without binding the artifact to a
+// specific LLM provider. When the live narrator is active, the same state shape
+// and event log remain useful as its grounding context.
+
+const MESSAGE_TEMPLATES = {
+  check_in: "Hey. Still alive over there?",
+  ask_about_day: "How's your day going?",
+  invite_coffee: "Want to grab coffee sometime this week?",
+};
+
+const BUZZ_FEED_ITEMS = [
+  "Open mic sign-ups are live at the Student Union desk.",
+  "Intramural teams are still short two runners.",
+  "The library extended weekend hours for first-year advising.",
+  "Someone posted a lost keyring notice near the dining hall.",
+  "The bookstore is discounting used lab notebooks this week.",
+  "A philosophy club flyer asks if a sandwich can be lonely.",
+];
+
+const STAT_LABELS = {
+  charm: "Charm",
+  sensitivity: "Sensitivity",
+  knowledge: "Knowledge",
+  athletics: "Athletics",
+  grit: "Grit",
+};
+
+function clampValue(value, min = 0, max = 100) {
+  return Math.max(min, Math.min(max, value));
+}
+
+function changeStats(state, changes) {
+  const stats = { ...(state.player?.stats || {}) };
+  for (const [stat, delta] of Object.entries(changes || {})) {
+    if (typeof stats[stat] !== "number" || typeof delta !== "number") continue;
+    stats[stat] = clampValue(stats[stat] + delta);
+  }
+  return { ...state, player: { ...state.player, stats } };
+}
+
+function changeResources(state, changes) {
+  const resources = { ...(state.player?.resources || {}) };
+  if (typeof changes?.energy === "number") resources.energy = clampValue((resources.energy || 0) + changes.energy);
+  if (typeof changes?.money === "number") resources.money = Math.max(0, (resources.money || 0) + changes.money);
+  return { ...state, player: { ...state.player, resources } };
+}
+
+function changeRelationship(state, npcId, delta, status) {
+  const relationships = { ...(state.player?.relationships || {}) };
+  const current = relationships[npcId];
+  const currentRecord = current && typeof current === "object" ? current : {};
+  const currentScore = typeof current === "number"
+    ? current
+    : (typeof currentRecord.score === "number" ? currentRecord.score : 0);
+
+  relationships[npcId] = {
+    ...currentRecord,
+    score: currentScore + delta,
+    status: status || currentRecord.status || "developing",
+  };
+
+  return { ...state, player: { ...state.player, relationships } };
+}
+
+function addTrait(state, trait) {
+  const traits = state.player?.traits || [];
+  if (traits.includes(trait)) return state;
+  return { ...state, player: { ...state.player, traits: [...traits, trait] } };
+}
+
+function getKnownNpc(state, key) {
+  const directory = state.npcDirectory || {};
+  return (
+    directory[key] ||
+    STARTER_NPCS[key] ||
+    Object.values(directory).find(npc => npc.portraitKey === key || npc.id === key || npc.name === key) ||
+    Object.values(STARTER_NPCS).find(npc => npc.portraitKey === key || npc.id === key) ||
+    { id: key, name: key, portraitKey: key, role: "Contact" }
+  );
+}
+
+function formatMoment(day = 1, slot = 0) {
+  const safeDay = typeof day === "number" && day > 0 ? day : 1;
+  const week = Math.floor((safeDay - 1) / 7) + 1;
+  const dayName = DAY_LABELS[(safeDay - 1) % DAY_LABELS.length];
+  const slotLabel = typeof slot === "number" ? (TIME_LABELS[slot] || `Slot ${slot}`) : slot;
+  return `W${week} ${dayName} ${slotLabel}`;
+}
+
+function eventSummary(event) {
+  return event?.text || event?.summary || event?.event_summary || event?.label || event?.kind || "Untitled event";
+}
+
+function noteMoment(note) {
+  return formatMoment(note?.day, note?.slot);
+}
+
+function applyActivityOutcome(state, choice) {
+  let next = state;
+  let notification = null;
+
+  switch (choice.id) {
+    case "study_deep":
+      next = changeResources(changeStats(next, { knowledge: 4, grit: 1 }), { energy: -8 });
+      next = appendEvent(next, "Studied seriously at the library.");
+      break;
+    case "browse_stacks":
+      next = changeStats(next, { knowledge: 2, sensitivity: 1 });
+      next = appendEvent(next, "Wandered the library stacks and found a few promising books.");
+      break;
+    case "workout_weights":
+      next = changeResources(changeStats(next, { athletics: 4, grit: 2 }), { energy: -12 });
+      next = appendEvent(next, "Lifted weights at the gym.");
+      break;
+    case "workout_cardio":
+      next = changeResources(changeStats(next, { athletics: 3, grit: 1 }), { energy: -10 });
+      next = appendEvent(next, "Put in a cardio session at the gym.");
+      break;
+    case "trail_run":
+      next = changeResources(changeStats(next, { athletics: 3, grit: 1 }), { energy: -9 });
+      next = appendEvent(next, "Ran the creekside trail.");
+      break;
+    case "trail_walk":
+      next = changeStats(next, { sensitivity: 2, grit: 1 });
+      next = appendEvent(next, "Took a long walk on the running trail.");
+      break;
+    case "browse_flyers":
+      next = addTrait(changeStats(next, { charm: 1, knowledge: 1 }), "campus-curious");
+      next = appendEvent(next, "Browsed the student union flyer board.");
+      notification = { app: "Buzz", body: "A few campus events caught your eye." };
+      break;
+    case "people_watch":
+      next = changeStats(next, { sensitivity: 2, charm: 1 });
+      next = appendEvent(next, "People-watched in the student union.");
+      break;
+    case "eat_meal":
+      next = changeResources(next, { energy: 14, money: -4 });
+      next = appendEvent(next, "Ate a real meal at the dining hall.");
+      break;
+    case "sit_with_strangers":
+      next = changeResources(changeStats(next, { charm: 2 }), { energy: 6 });
+      next = appendEvent(next, "Sat near a busy table and made a little small talk.");
+      break;
+    case "browse_books":
+      next = changeStats(next, { knowledge: 2, sensitivity: 1 });
+      next = appendEvent(next, "Browsed the back shelves at the bookstore.");
+      break;
+    case "buy_supplies":
+      next = changeResources(changeStats(next, { grit: 1 }), { money: -8 });
+      next = appendEvent(next, "Bought basic school supplies.");
+      break;
+    case "review_notes":
+      next = changeResources(changeStats(next, { knowledge: 3, grit: 1 }), { energy: -5 });
+      next = appendEvent(next, "Reviewed class notes in the dorm room.");
+      break;
+    case "tidy_room":
+      next = changeResources(changeStats(next, { grit: 1 }), { energy: -3 });
+      next = appendEvent(next, "Put the dorm room in better order.");
+      break;
+    case "sit_window":
+      next = changeResources(changeStats(next, { knowledge: 2 }), { energy: 2, money: -3 });
+      next = appendEvent(next, "Studied for a while in the coffee shop window booth.");
+      break;
+    case "chat_counter":
+      next = changeStats(next, { charm: 2, sensitivity: 1 });
+      next = changeRelationship(next, "studious", 1, "friendly");
+      next = appendEvent(next, "Chatted with Mari at the coffee shop counter.", ["studious"]);
+      break;
+    case "leave":
+      next = appendEvent(next, "Decided not to linger.");
+      break;
+    default:
+      return { state: next, notification };
+  }
+
+  return { state: next, notification };
+}
+
+function navigateToLocation(state, locationKey) {
+  if (state.location === locationKey) return { state };
+  const destination = LOCATIONS[locationKey]?.label || locationKey;
+  const next = advanceTime(appendEvent(state, `Walked to ${destination}`), 1);
+  return { state: { ...next, location: locationKey } };
+}
+
+function applyChoice(state, choice) {
+  let next = advanceTime(appendEvent(state, `Chose: ${choice.label}`), 1);
+  let notification = null;
+
+  if (choice.tag === "intro_complete") next = { ...next, introSeen: true };
+
+  if (choice.tag === "met_mari" || choice.tag === "met_mari_quiet") {
+    next = appendEvent(next, "Met Mari at the coffee shop.", ["studious"]);
+    next = {
+      ...next,
+      metMari: true,
+      npcsKnown: next.npcsKnown.includes("studious") ? next.npcsKnown : [...next.npcsKnown, "studious"],
+      player: {
+        ...next.player,
+        relationships: {
+          ...(next.player.relationships || {}),
+          studious: {
+            score: 1,
+            status: "met",
+            lastSeenDisposition: "Professionally warm and curious.",
+          },
+        },
+      },
+    };
+    notification = { app: "Pulse", body: "Mari saved your number." };
+  }
+
+  if (choice.id === "go_coffee") next = { ...next, location: "coffee_shop" };
+  if (choice.id === "explore") next = { ...next, location: "quad" };
+
+  if (choice.id === "rest" || choice.id === "wait") {
+    next = changeResources(next, { energy: 8 });
+  }
+
+  const activityUpdate = applyActivityOutcome(next, choice);
+  return {
+    state: activityUpdate.state,
+    notification: activityUpdate.notification || notification,
+  };
+}
+
+function sendPulseMessage(state, npcId, templateId) {
+  const npc = getKnownNpc(state, npcId);
+  const text = MESSAGE_TEMPLATES[templateId] || MESSAGE_TEMPLATES.check_in;
+  const idSeed = `${state.day}-${state.timeSlot}-${npcId}-${templateId}-${Date.now()}`;
+  const outgoing = {
+    id: `${idSeed}-out`,
+    day: state.day,
+    slot: state.timeSlot,
+    npcId,
+    direction: "outgoing",
+    text,
+    read: true,
+  };
+  const incoming = {
+    id: `${idSeed}-in`,
+    day: state.day,
+    slot: state.timeSlot,
+    npcId,
+    direction: "incoming",
+    text: npc?.name === "Mari"
+      ? "Not bad. Busy, but that's normal. You settling in okay?"
+      : "Yeah, I'm around. What's up?",
+    read: false,
+  };
+
+  let next = appendEvent(
+    {
+      ...state,
+      messages: [...(state.messages || []), outgoing, incoming],
+    },
+    `Texted ${npc?.name || npcId}: ${text}`,
+    [npcId],
+  );
+  next = changeRelationship(next, npcId, templateId === "invite_coffee" ? 2 : 1, "texting");
+
+  return {
+    state: next,
+    notification: { app: "Pulse", body: `${npc?.name || npcId} replied.` },
+  };
+}
+
+function addMarginNote(state, text) {
+  const trimmed = String(text || "").trim();
+  if (!trimmed) return { state };
+
+  const note = {
+    id: `${state.day}-${state.timeSlot}-${Date.now()}`,
+    day: state.day,
+    slot: state.timeSlot,
+    text: trimmed,
+  };
+
+  return {
+    state: {
+      ...appendEvent(state, "Added a note in Margin."),
+      notes: [...(state.notes || []), note],
+    },
+  };
+}
+
+// ============================================================================
 // PERSISTENCE
 // ============================================================================
 
@@ -772,19 +1089,19 @@ async function clearState() {
 }
 
 // ============================================================================
-// SCRIPTED SCENE — coffee shop intro (preserved from v0 skeleton)
+// SCRIPTED SCENES
 // ============================================================================
 //
 // The narrator harness is where prompt iteration happens. This scripted scene
-// exists so the playable artifact has something to do without LLM calls.
-// Replace this whole module when the live narration loop comes online.
+// set exists so the playable artifact has something to do without LLM calls.
+// Replace or supplement this module when the live narration loop comes online.
 
 function getScriptedScene(state) {
   const { location, day, timeSlot, metMari, introSeen } = state;
 
   if (location === "dorm_room" && !introSeen) {
     return {
-      narration: "First morning. The boxes you didn't unpack last night are still where you left them. Your roommate Marcus is gone — there's a note on the fridge in handwriting that's somehow already familiar: \"coffee shop down the street is good. back by noon.\" The room is too quiet.",
+      narration: "First morning. The boxes you didn't unpack last night are still where you left them. Your roommate Marcus is gone. There's a note on the fridge in handwriting that's somehow already familiar: \"coffee shop down the street is good. back by noon.\" The room is too quiet.",
       choices: [
         { id: "go_coffee",  label: "Head to the coffee shop",   tag: "intro_complete" },
         { id: "unpack",     label: "Stay in and unpack",         tag: "intro_complete" },
@@ -795,11 +1112,11 @@ function getScriptedScene(state) {
 
   if (location === "coffee_shop" && !metMari) {
     return {
-      narration: "The bell above the door chimes. The shop smells like good coffee and old wood. Behind the counter, a barista with copper hair glances up — sees you, registers \"new face,\" and gives you a half-smile that's mostly professional with a little curiosity underneath. \"What can I get you?\"",
+      narration: "The bell above the door chimes. The shop smells like good coffee and old wood. Behind the counter, a barista with copper hair glances up, registers new face, and gives you a half-smile that's mostly professional with a little curiosity underneath. \"What can I get you?\"",
       choices: [
         { id: "order_drip",   label: "\"Just a drip coffee, please.\"", tag: "met_mari" },
         { id: "order_fancy",  label: "\"What do you recommend?\"",       tag: "met_mari" },
-        { id: "look_around",  label: "Stall — look at the menu board",   tag: "met_mari_quiet" },
+        { id: "look_around",  label: "Stall and read the menu",          tag: "met_mari_quiet" },
       ],
     };
   }
@@ -808,18 +1125,94 @@ function getScriptedScene(state) {
     return {
       narration: "The shop is quieter this time. Mari spots you, gives a small nod from behind the espresso machine. The same booth by the window is open.",
       choices: [
-        { id: "sit_window",   label: "Take the window booth" },
+        { id: "sit_window",   label: "Take the window booth and study" },
         { id: "chat_counter", label: "Lean on the counter and chat" },
         { id: "leave",        label: "Just grab something to go" },
       ],
     };
   }
 
-  // Generic placeholder
+  if (location === "library_main" || location === "library_stacks") {
+    return {
+      narration: "The library lowers its voice around you. Laptops glow between stacks of books, and every table has the same quiet bargain with time.",
+      choices: [
+        { id: "study_deep",    label: "Settle in for focused study" },
+        { id: "browse_stacks", label: "Wander the stacks" },
+        { id: "leave",         label: "Pack up and move on" },
+      ],
+    };
+  }
+
+  if (location === "gym") {
+    return {
+      narration: "The gym is all rubber floor, metal rhythm, and people pretending not to check whether anyone is watching their form.",
+      choices: [
+        { id: "workout_weights", label: "Lift for a while" },
+        { id: "workout_cardio",  label: "Use the cardio machines" },
+        { id: "leave",           label: "Head back out" },
+      ],
+    };
+  }
+
+  if (location === "running_trail") {
+    return {
+      narration: "The trail follows the creek through a strip of green that makes campus feel farther away than it is.",
+      choices: [
+        { id: "trail_run",  label: "Go for a run" },
+        { id: "trail_walk", label: "Take a thinking walk" },
+        { id: "leave",      label: "Turn back toward campus" },
+      ],
+    };
+  }
+
+  if (location === "student_union") {
+    return {
+      narration: "The student union is busy in layers: club tables near the doors, people waiting for food, someone laughing too loudly by the bulletin board.",
+      choices: [
+        { id: "browse_flyers", label: "Browse the flyer board" },
+        { id: "people_watch",  label: "People-watch from a couch" },
+        { id: "leave",         label: "Cut through and leave" },
+      ],
+    };
+  }
+
+  if (location === "dining_hall") {
+    return {
+      narration: "The dining hall hums with trays, half-finished conversations, and the practical relief of food you do not have to cook.",
+      choices: [
+        { id: "eat_meal",           label: "Eat a real meal" },
+        { id: "sit_with_strangers", label: "Sit near a busy table" },
+        { id: "leave",              label: "Take something to go" },
+      ],
+    };
+  }
+
+  if (location === "bookstore") {
+    return {
+      narration: "The bookstore smells like paper, dust, and branded sweatshirts. The course texts are up front, but the better shelves wait in back.",
+      choices: [
+        { id: "browse_books", label: "Browse the back shelves" },
+        { id: "buy_supplies", label: "Buy basic supplies" },
+        { id: "leave",        label: "Head back outside" },
+      ],
+    };
+  }
+
+  if (location === "dorm_room" && introSeen) {
+    return {
+      narration: "Your room is starting to look less like a storage unit and more like a place you might actually sleep. The quiet is useful, if you can keep from wasting it.",
+      choices: [
+        { id: "review_notes", label: "Review class notes" },
+        { id: "rest",         label: "Rest for a while" },
+        { id: "tidy_room",    label: "Put the room in order" },
+      ],
+    };
+  }
+
   const loc = LOCATIONS[location];
   const partOfDay = TIME_LABELS[timeSlot].toLowerCase();
   return {
-    narration: `${loc?.label || "Here"}. ${partOfDay}, day ${day}. (Scripted scene not yet written for this location — narrator will pick this up later.)`,
+    narration: `${loc?.label || "Here"}. ${partOfDay}, day ${day}. The semester keeps moving around you.`,
     choices: [
       { id: "wait",  label: "Spend some time here" },
       { id: "leave", label: "Move on" },
@@ -1329,7 +1722,7 @@ function CompassApp({ state, onBack, onNavigate }) {
 }
 
 function RosterApp({ state, onBack }) {
-  const known = state.npcsKnown;
+  const known = (state.npcsKnown || []).map(key => getKnownNpc(state, key)).filter(Boolean);
   return (
     <AppShell title="Roster" onBack={onBack}>
       {known.length === 0 ? (
@@ -1341,8 +1734,10 @@ function RosterApp({ state, onBack }) {
         </div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {known.map(key => (
-            <div key={key} style={{
+          {known.map(npc => {
+            const relationship = state.player.relationships?.[npc.id] || {};
+            return (
+            <div key={npc.id} style={{
               display: "flex", alignItems: "center", gap: 12,
               padding: "10px 12px",
               background: "rgba(58,53,48,0.04)",
@@ -1354,16 +1749,19 @@ function RosterApp({ state, onBack }) {
                 overflow: "hidden", flexShrink: 0,
                 border: "1px solid rgba(58,53,48,0.18)",
               }}>
-                {PORTRAIT_SVGS[key] ? <InlineSvg svg={PORTRAIT_SVGS[key]} /> : null}
+                {PORTRAIT_SVGS[npc.portraitKey || npc.id] ? <InlineSvg svg={PORTRAIT_SVGS[npc.portraitKey || npc.id]} /> : null}
               </div>
-              <div>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{key === "studious" ? "Mari" : key}</div>
+              <div style={{ minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600 }}>{npc.name || npc.id}</div>
                 <div style={{ fontSize: 11, color: "#7a6e58" }}>
-                  {key === "studious" ? "Coffee shop barista" : "—"}
+                  {npc.role || "Contact"}
+                </div>
+                <div style={{ fontSize: 10, color: "#8b6f3d", marginTop: 3 }}>
+                  {relationship.status || "known"} {typeof relationship.score === "number" ? `+${relationship.score}` : ""}
                 </div>
               </div>
             </div>
-          ))}
+          );})}
         </div>
       )}
     </AppShell>
@@ -1417,6 +1815,317 @@ function SelfApp({ state, onBack }) {
           <span>Money</span><span style={{ color: "#7a6e58" }}>${resources.money}</span>
         </div>
       </div>
+      <div style={{ marginTop: 18 }}>
+        <div style={{
+          fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase",
+          color: "#8b6f3d", fontWeight: 600, marginBottom: 8,
+        }}>Traits</div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          {(state.player.traits || []).length ? state.player.traits.map(trait => (
+            <span key={trait} style={{
+              padding: "5px 8px",
+              border: "1px solid rgba(58,53,48,0.12)",
+              borderRadius: 12,
+              fontSize: 11,
+              color: "#3a3530",
+              background: "rgba(200,161,101,0.12)",
+            }}>{trait}</span>
+          )) : (
+            <span style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No traits recorded yet.</span>
+          )}
+        </div>
+      </div>
+    </AppShell>
+  );
+}
+
+function PhoneSection({ title, children, dark = false }) {
+  return (
+    <section style={{
+      border: `1px solid ${dark ? "rgba(240,235,220,0.12)" : "rgba(58,53,48,0.10)"}`,
+      borderRadius: 8,
+      padding: 12,
+      background: dark ? "rgba(240,235,220,0.04)" : "rgba(255,255,255,0.38)",
+      marginBottom: 12,
+    }}>
+      {title && (
+        <h2 style={{
+          margin: "0 0 8px",
+          fontSize: 11,
+          letterSpacing: 1.2,
+          textTransform: "uppercase",
+          color: dark ? "#c8a165" : "#8b6f3d",
+        }}>{title}</h2>
+      )}
+      {children}
+    </section>
+  );
+}
+
+function TimelineItem({ when, children, dark = false }) {
+  return (
+    <article style={{
+      padding: "8px 0",
+      borderTop: `1px solid ${dark ? "rgba(240,235,220,0.10)" : "rgba(58,53,48,0.08)"}`,
+    }}>
+      <small style={{
+        display: "block",
+        marginBottom: 3,
+        color: dark ? "rgba(240,235,220,0.52)" : "#8b6f3d",
+        fontSize: 10,
+      }}>{when}</small>
+      <p style={{
+        margin: 0,
+        color: dark ? "#f0ebdc" : "#3a3530",
+        fontSize: 12,
+        lineHeight: 1.42,
+      }}>{children}</p>
+    </article>
+  );
+}
+
+function PulseApp({ state, onBack, onSendMessage }) {
+  const contacts = (state.npcsKnown || []).map(key => getKnownNpc(state, key)).filter(Boolean);
+  const actionStyle = {
+    border: "1px solid rgba(58,53,48,0.12)",
+    background: "rgba(200,161,101,0.14)",
+    color: "#3a3530",
+    borderRadius: 6,
+    padding: "7px 8px",
+    fontSize: 11,
+    cursor: "pointer",
+  };
+
+  return (
+    <AppShell title="Pulse" onBack={onBack}>
+      {!contacts.length ? (
+        <div style={{
+          padding: "40px 20px", textAlign: "center",
+          color: "#7a6e58", fontStyle: "italic", fontSize: 13,
+        }}>
+          No contacts yet.
+        </div>
+      ) : (
+        contacts.map(contact => {
+          const thread = (state.messages || []).filter(message => message.npcId === contact.id).slice(-4);
+          return (
+            <PhoneSection key={contact.id}>
+              <div style={{ marginBottom: 10 }}>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>{contact.name}</div>
+                <div style={{ fontSize: 11, color: "#7a6e58" }}>{contact.role || "Contact"}</div>
+              </div>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+                {thread.length ? thread.map(message => {
+                  const incoming = message.direction === "incoming";
+                  return (
+                    <div key={message.id} style={{
+                      alignSelf: incoming ? "flex-start" : "flex-end",
+                      maxWidth: "86%",
+                      padding: "7px 9px",
+                      borderRadius: 10,
+                      background: incoming ? "rgba(58,53,48,0.08)" : "rgba(200,161,101,0.24)",
+                      color: "#3a3530",
+                      fontSize: 12,
+                      lineHeight: 1.35,
+                    }}>
+                      <div>{message.text}</div>
+                      <small style={{ color: "#8b6f3d", fontSize: 9 }}>{formatMoment(message.day, message.slot)}</small>
+                    </div>
+                  );
+                }) : (
+                  <div style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No messages yet.</div>
+                )}
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
+                <button type="button" onClick={() => onSendMessage(contact.id, "check_in")} style={actionStyle}>Check in</button>
+                <button type="button" onClick={() => onSendMessage(contact.id, "ask_about_day")} style={actionStyle}>Ask about day</button>
+                <button type="button" onClick={() => onSendMessage(contact.id, "invite_coffee")} style={actionStyle}>Invite coffee</button>
+              </div>
+            </PhoneSection>
+          );
+        })
+      )}
+    </AppShell>
+  );
+}
+
+function BuzzApp({ state, onBack }) {
+  const offset = state.day % BUZZ_FEED_ITEMS.length;
+  const feed = [...BUZZ_FEED_ITEMS.slice(offset), ...BUZZ_FEED_ITEMS.slice(0, offset)].slice(0, 4);
+  const recent = (state.eventLog || []).slice(-4).reverse();
+
+  return (
+    <AppShell title="Buzz" onBack={onBack} dark>
+      <PhoneSection title="Campus Pulse" dark>
+        <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: "#f0ebdc" }}>
+          {LOCATIONS[state.location]?.label || state.location} is trending around your current orbit.
+        </p>
+      </PhoneSection>
+      <PhoneSection title="Feed" dark>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+          {feed.map((item, index) => (
+            <article key={item} style={{
+              border: "1px solid rgba(240,235,220,0.10)",
+              borderRadius: 8,
+              padding: 10,
+              background: "rgba(200,161,101,0.08)",
+              minHeight: 82,
+            }}>
+              <small style={{ color: "#c8a165", fontSize: 10 }}>#{index + 1}</small>
+              <p style={{ margin: "4px 0 0", color: "#f0ebdc", fontSize: 12, lineHeight: 1.36 }}>{item}</p>
+            </article>
+          ))}
+        </div>
+      </PhoneSection>
+      <PhoneSection title="Your Footprint" dark>
+        {recent.length ? recent.map((event, index) => (
+          <TimelineItem dark when={formatMoment(event.day, event.slot || 0)} key={`${event.day}-${event.slot}-${index}`}>
+            {eventSummary(event)}
+          </TimelineItem>
+        )) : (
+          <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>Nothing logged yet.</p>
+        )}
+      </PhoneSection>
+    </AppShell>
+  );
+}
+
+function AnthropApp({ state, onBack }) {
+  const stats = state.player.stats || {};
+  const statEntries = Object.entries(stats);
+  const weak = statEntries.slice().sort((a, b) => a[1] - b[1])[0]?.[0] || "knowledge";
+  const strong = statEntries.slice().sort((a, b) => b[1] - a[1])[0]?.[0] || "charm";
+  const recentEvents = (state.eventLog || []).slice(-5).reverse();
+  const relationshipEntries = Object.entries(state.player.relationships || {});
+
+  return (
+    <AppShell title="Anthrop" onBack={onBack} dark>
+      <PhoneSection title="Readout" dark>
+        <p style={{ margin: "0 0 8px", color: "#f0ebdc", fontSize: 13, lineHeight: 1.45 }}>
+          Week {Math.floor((state.day - 1) / 7) + 1}, currently at {LOCATIONS[state.location]?.label || state.location}.
+          Your strongest stat is {STAT_LABELS[strong] || strong} and the easiest gain right now is probably {STAT_LABELS[weak] || weak}.
+        </p>
+        <p style={{ margin: 0, color: "rgba(240,235,220,0.72)", fontSize: 12 }}>
+          Energy is {state.player.resources.energy}/100 and money is ${state.player.resources.money}.
+        </p>
+      </PhoneSection>
+      <PhoneSection title="Suggestions" dark>
+        <ul style={{ margin: 0, paddingLeft: 18, color: "#f0ebdc", fontSize: 12, lineHeight: 1.55 }}>
+          <li>{weak === "knowledge" ? "Study at the library or review notes in the dorm." : "Use location activities to round out the low stat."}</li>
+          <li>{state.player.resources.energy < 35 ? "Recover energy before stacking more demanding activities." : "You have enough energy for one serious activity."}</li>
+          <li>{state.npcsKnown.length ? "Use Pulse to keep a contact warm between in-person scenes." : "Explore town or campus until you meet someone worth saving."}</li>
+        </ul>
+      </PhoneSection>
+      <PhoneSection title="Relationships" dark>
+        {relationshipEntries.length ? (
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
+            {relationshipEntries.map(([npcId, record]) => {
+              const npc = getKnownNpc(state, npcId);
+              const score = typeof record === "object" ? record.score : record;
+              return (
+                <div key={npcId} style={{
+                  border: "1px solid rgba(240,235,220,0.10)",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  display: "flex",
+                  justifyContent: "space-between",
+                  gap: 8,
+                  color: "#f0ebdc",
+                  fontSize: 12,
+                }}>
+                  <span>{npc.name || npcId}</span>
+                  <strong>{score ?? 0}</strong>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>No relationship records yet.</p>
+        )}
+      </PhoneSection>
+      <PhoneSection title="Recent" dark>
+        {recentEvents.length ? recentEvents.map((event, index) => (
+          <TimelineItem dark when={formatMoment(event.day, event.slot || 0)} key={`${event.day}-${event.slot}-${index}`}>
+            {eventSummary(event)}
+          </TimelineItem>
+        )) : (
+          <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>No events logged yet.</p>
+        )}
+      </PhoneSection>
+    </AppShell>
+  );
+}
+
+function MarginApp({ state, onBack, onAddNote }) {
+  const [draft, setDraft] = useState("");
+  const recentEvents = (state.eventLog || []).slice(-12).reverse();
+  const submitNote = () => {
+    if (!draft.trim()) return;
+    onAddNote(draft);
+    setDraft("");
+  };
+
+  return (
+    <AppShell title="Margin" onBack={onBack}>
+      <PhoneSection title="New Note">
+        <textarea
+          value={draft}
+          onChange={event => setDraft(event.target.value)}
+          placeholder="Write what the player should remember..."
+          style={{
+            width: "100%",
+            minHeight: 92,
+            resize: "vertical",
+            boxSizing: "border-box",
+            border: "1px solid rgba(58,53,48,0.14)",
+            borderRadius: 8,
+            padding: 10,
+            fontFamily: "system-ui, sans-serif",
+            fontSize: 12,
+            background: "rgba(255,255,255,0.45)",
+            color: "#3a3530",
+            outline: "none",
+          }}
+        />
+        <button
+          type="button"
+          onMouseDown={event => {
+            event.preventDefault();
+            submitNote();
+          }}
+          onClick={submitNote}
+          disabled={!draft.trim()}
+          style={{
+            marginTop: 8,
+            width: "100%",
+            border: "1px solid rgba(58,53,48,0.12)",
+            background: draft.trim() ? "rgba(200,161,101,0.22)" : "rgba(58,53,48,0.04)",
+            color: draft.trim() ? "#3a3530" : "#8b8173",
+            borderRadius: 6,
+            padding: "8px 10px",
+            fontSize: 12,
+            cursor: draft.trim() ? "pointer" : "default",
+          }}
+        >
+          Add note
+        </button>
+      </PhoneSection>
+      <PhoneSection title="Notes">
+        {(state.notes || []).length ? state.notes.slice().reverse().map(note => (
+          <TimelineItem when={noteMoment(note)} key={note.id}>{note.text}</TimelineItem>
+        )) : (
+          <p style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No notes yet.</p>
+        )}
+      </PhoneSection>
+      <PhoneSection title="Recent Log">
+        {recentEvents.length ? recentEvents.map((event, index) => (
+          <TimelineItem when={formatMoment(event.day, event.slot || 0)} key={`${event.day}-${event.slot}-${index}`}>
+            {eventSummary(event)}
+          </TimelineItem>
+        )) : (
+          <p style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No events logged yet.</p>
+        )}
+      </PhoneSection>
     </AppShell>
   );
 }
@@ -1497,7 +2206,7 @@ export default function StudentBody() {
   useEffect(() => {
     (async () => {
       const saved = await loadState();
-      setState(saved || makeFreshState());
+      setState(saved ? normalizeState(saved) : makeFreshState());
       setLoaded(true);
     })();
   }, []);
@@ -1537,6 +2246,7 @@ export default function StudentBody() {
 
   const openApp = useCallback((appId) => {
     const app = APP_BY_ID[appId];
+    if (!app) return;
     setPhone(p => ({
       ...p,
       view: `app:${appId}`,
@@ -1550,41 +2260,34 @@ export default function StudentBody() {
 
   const handleNavigate = useCallback((locationKey) => {
     setState(s => {
-      let next = appendEvent(s, `Walked to ${LOCATIONS[locationKey]?.label}`);
-      next = advanceTime(next, 1);
-      return { ...next, location: locationKey };
+      const update = navigateToLocation(s, locationKey);
+      return normalizeState(update.state);
     });
     setPhone({ open: false, view: "home", orientation: "portrait" });
   }, []);
 
   const handleChoice = useCallback((choice) => {
     setState(s => {
-      let next = appendEvent(s, `Chose: ${choice.label}`);
-      next = advanceTime(next, 1);
-      // Tag-based effects
-      if (choice.tag === "intro_complete") next = { ...next, introSeen: true };
-      if (choice.tag === "met_mari" || choice.tag === "met_mari_quiet") {
-        next = {
-          ...next, metMari: true,
-          npcsKnown: next.npcsKnown.includes("studious") ? next.npcsKnown : [...next.npcsKnown, "studious"],
-        };
-        // Trigger a notification banner the next "tick" - simulate Sienna texting later
-        setTimeout(() => {
-          showNotif({ app: "Pulse", body: "Mari saved your number." });
-        }, 1500);
+      const update = applyChoice(s, choice);
+      if (update.notification) {
+        const delay = update.notification.app === "Pulse" ? 1500 : 600;
+        setTimeout(() => showNotif(update.notification), delay);
       }
-      // Move to coffee shop on intro choice
-      if (choice.id === "go_coffee") next = { ...next, location: "coffee_shop" };
-      // Energy
-      if (choice.id === "rest" || choice.id === "wait") {
-        next = { ...next, player: {
-          ...next.player,
-          resources: { ...next.player.resources, energy: Math.min(100, next.player.resources.energy + 8) },
-        }};
-      }
-      return next;
+      return normalizeState(update.state);
     });
   }, [showNotif]);
+
+  const handleSendMessage = useCallback((npcId, templateId) => {
+    setState(s => {
+      const update = sendPulseMessage(s, npcId, templateId);
+      if (update.notification) setTimeout(() => showNotif(update.notification), 200);
+      return normalizeState(update.state);
+    });
+  }, [showNotif]);
+
+  const handleAddNote = useCallback((text) => {
+    setState(s => normalizeState(addMarginNote(s, text).state));
+  }, []);
 
   if (!loaded || !state) {
     return (
@@ -1611,8 +2314,12 @@ export default function StudentBody() {
     const app = APP_BY_ID[appId];
     if (!app) phoneContent = <PhoneHomeScreen state={state} onOpenApp={openApp} />;
     else if (appId === "compass") phoneContent = <CompassApp state={state} onBack={backToHome} onNavigate={handleNavigate} />;
+    else if (appId === "pulse")   phoneContent = <PulseApp   state={state} onBack={backToHome} onSendMessage={handleSendMessage} />;
     else if (appId === "roster")  phoneContent = <RosterApp  state={state} onBack={backToHome} />;
     else if (appId === "self")    phoneContent = <SelfApp    state={state} onBack={backToHome} />;
+    else if (appId === "buzz")    phoneContent = <BuzzApp    state={state} onBack={backToHome} />;
+    else if (appId === "anthrop") phoneContent = <AnthropApp state={state} onBack={backToHome} />;
+    else if (appId === "margin")  phoneContent = <MarginApp  state={state} onBack={backToHome} onAddNote={handleAddNote} />;
     else                          phoneContent = <StubApp    app={app}     onBack={backToHome} />;
   }
 
@@ -1671,8 +2378,13 @@ export default function StudentBody() {
               notif={notif}
               onDismiss={() => setNotif(null)}
               onTap={() => {
+                const app = APP_BY_ID[String(notif?.app || "").toLowerCase()];
                 setNotif(null);
-                setPhone({ open: true, view: "home", orientation: "portrait" });
+                setPhone({
+                  open: true,
+                  view: app ? `app:${app.id}` : "home",
+                  orientation: app ? app.layout : "portrait",
+                });
               }}
             />
 
