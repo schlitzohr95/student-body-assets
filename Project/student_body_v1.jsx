@@ -233,6 +233,7 @@ function makeFreshState() {
     messages: [],
     notes: [],
     eventLog: [],
+    activityHistory: { activities: {} },
   };
 }
 
@@ -260,6 +261,7 @@ function normalizeState(state) {
     messages: migrateTimedRecords(state.messages, legacyTimeScale),
     notes: migrateTimedRecords(state.notes, legacyTimeScale),
     eventLog: migrateTimedRecords(state.eventLog, legacyTimeScale),
+    activityHistory: normalizeActivityHistory(state.activityHistory),
   };
 }
 
@@ -1027,6 +1029,160 @@ const RELATIONSHIP_FLAG_LABELS = {
   date_planned: "Date planned",
 };
 
+const ACTIVITY_DEFINITIONS = {
+  study_deep: {
+    label: "Focused study",
+    groups: ["study"],
+    stats: { knowledge: 4, grit: 1 },
+    resources: { energy: -8 },
+    event: "Studied seriously at the library.",
+    gates: [
+      { kind: "resource", key: "energy", min: 12, label: "Energy" },
+      { kind: "stat", key: "grit", min: 25, label: "Grit" },
+    ],
+  },
+  browse_stacks: {
+    label: "Browsing the stacks",
+    groups: ["study", "reflective"],
+    stats: { knowledge: 2, sensitivity: 1 },
+    event: "Wandered the library stacks and found a few promising books.",
+  },
+  workout_weights: {
+    label: "Weight training",
+    groups: ["fitness"],
+    stats: { athletics: 4, grit: 2 },
+    resources: { energy: -12 },
+    event: "Lifted weights at the gym.",
+    gates: [
+      { kind: "resource", key: "energy", min: 18, label: "Energy" },
+      { kind: "stat", key: "athletics", min: 20, label: "Athletics" },
+    ],
+  },
+  workout_cardio: {
+    label: "Cardio",
+    groups: ["fitness"],
+    stats: { athletics: 3, grit: 1 },
+    resources: { energy: -10 },
+    event: "Put in a cardio session at the gym.",
+    gates: [
+      { kind: "resource", key: "energy", min: 14, label: "Energy" },
+      { kind: "stat", key: "athletics", min: 20, label: "Athletics" },
+    ],
+  },
+  trail_run: {
+    label: "Trail run",
+    groups: ["fitness", "outdoors"],
+    stats: { athletics: 3, grit: 1 },
+    resources: { energy: -9 },
+    event: "Ran the creekside trail.",
+    gates: [
+      { kind: "resource", key: "energy", min: 14, label: "Energy" },
+      { kind: "stat", key: "athletics", min: 20, label: "Athletics" },
+    ],
+  },
+  trail_walk: {
+    label: "Thinking walk",
+    groups: ["outdoors", "reflective"],
+    stats: { sensitivity: 2, grit: 1 },
+    event: "Took a long walk on the running trail.",
+  },
+  browse_flyers: {
+    label: "Flyer board",
+    groups: ["campus", "social"],
+    stats: { charm: 1, knowledge: 1 },
+    event: "Browsed the student union flyer board.",
+    notification: { app: "Buzz", body: "A few campus events caught your eye." },
+  },
+  people_watch: {
+    label: "People-watching",
+    groups: ["campus", "social", "reflective"],
+    stats: { sensitivity: 2, charm: 1 },
+    event: "People-watched in the student union.",
+  },
+  eat_meal: {
+    label: "Real meal",
+    groups: ["self-care"],
+    resources: { energy: 14, money: -4 },
+    event: "Ate a real meal at the dining hall.",
+    gates: [{ kind: "resource", key: "money", min: 4, label: "Money" }],
+  },
+  sit_with_strangers: {
+    label: "Small talk",
+    groups: ["social"],
+    stats: { charm: 2 },
+    resources: { energy: 6 },
+    event: "Sat near a busy table and made a little small talk.",
+    gates: [{ kind: "stat", key: "charm", min: 25, label: "Charm" }],
+  },
+  browse_books: {
+    label: "Book browsing",
+    groups: ["study", "reflective"],
+    stats: { knowledge: 2, sensitivity: 1 },
+    event: "Browsed the back shelves at the bookstore.",
+  },
+  buy_supplies: {
+    label: "Supplies",
+    groups: ["prepared"],
+    stats: { grit: 1 },
+    resources: { money: -8 },
+    event: "Bought basic school supplies.",
+    gates: [{ kind: "resource", key: "money", min: 8, label: "Money" }],
+  },
+  review_notes: {
+    label: "Review notes",
+    groups: ["study", "prepared"],
+    stats: { knowledge: 3, grit: 1 },
+    resources: { energy: -5 },
+    event: "Reviewed class notes in the dorm room.",
+    gates: [
+      { kind: "resource", key: "energy", min: 8, label: "Energy" },
+      { kind: "stat", key: "knowledge", min: 25, label: "Knowledge" },
+    ],
+  },
+  tidy_room: {
+    label: "Tidy room",
+    groups: ["prepared", "self-care"],
+    stats: { grit: 1 },
+    resources: { energy: -3 },
+    event: "Put the dorm room in better order.",
+  },
+  sit_window: {
+    label: "Coffee shop study",
+    groups: ["study", "coffee"],
+    stats: { knowledge: 2 },
+    resources: { energy: 2, money: -3 },
+    event: "Studied for a while in the coffee shop window booth.",
+    gates: [{ kind: "resource", key: "money", min: 3, label: "Money" }],
+  },
+  chat_counter: {
+    label: "Counter chat",
+    groups: ["social", "coffee"],
+    stats: { charm: 2, sensitivity: 1 },
+    event: "Chatted with Mari at the coffee shop counter.",
+    witnesses: ["studious"],
+    gates: [{ kind: "stat", key: "charm", min: 25, label: "Charm" }],
+    relationship: {
+      npcId: "studious",
+      delta: 1,
+      status: "friendly",
+      removeFlags: ["awkward"],
+      lastSeenDisposition: "Warmer at the counter; willing to linger a little.",
+      momentText: "Chatted with Mari at the coffee shop counter.",
+    },
+  },
+};
+
+const REPEATED_ACTIVITY_TRAITS = [
+  { trait: "bookish", groups: ["study"], threshold: 3 },
+  { trait: "gym regular", groups: ["fitness"], threshold: 3 },
+  { trait: "campus-curious", groups: ["campus"], threshold: 2 },
+  { trait: "socially game", groups: ["social"], threshold: 4 },
+  { trait: "keeps it together", groups: ["prepared"], threshold: 3 },
+  { trait: "takes care of himself", groups: ["self-care"], threshold: 3 },
+  { trait: "coffee shop regular", groups: ["coffee"], threshold: 3 },
+  { trait: "needs air to think", groups: ["outdoors"], threshold: 3 },
+];
+
 function clampValue(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
 }
@@ -1151,6 +1307,147 @@ function addTrait(state, trait) {
   return { ...state, player: { ...state.player, traits: [...traits, trait] } };
 }
 
+function normalizeActivityHistory(history = {}) {
+  const source = history && typeof history === "object" ? history.activities || history : {};
+  const activities = {};
+
+  for (const [activityId, record] of Object.entries(source || {})) {
+    if (!record || typeof record !== "object") continue;
+    const recent = Array.isArray(record.recent)
+      ? record.recent
+        .filter(entry => entry && typeof entry === "object")
+        .map(entry => ({
+          day: typeof entry.day === "number" ? entry.day : 1,
+          slot: normalizeTimeSlot(entry.slot),
+          location: entry.location,
+        }))
+        .slice(-12)
+      : [];
+    activities[activityId] = {
+      total: Number(record.total) || recent.length || 0,
+      recent,
+      label: record.label || ACTIVITY_DEFINITIONS[activityId]?.label || activityId,
+    };
+  }
+
+  return { activities };
+}
+
+function countRecentActivity(state, activityId, dayWindow = 2) {
+  const history = normalizeActivityHistory(state.activityHistory);
+  const recent = history.activities[activityId]?.recent || [];
+  const now = (state.day * CHUNKS_PER_DAY) + normalizeTimeSlot(state.timeSlot);
+  const maxDistance = dayWindow * CHUNKS_PER_DAY;
+  return recent.filter(entry => {
+    const then = ((entry.day || 1) * CHUNKS_PER_DAY) + normalizeTimeSlot(entry.slot);
+    const distance = now - then;
+    return distance >= 0 && distance <= maxDistance;
+  }).length;
+}
+
+function countActivityGroup(state, group) {
+  const history = normalizeActivityHistory(state.activityHistory);
+  return Object.entries(history.activities).reduce((total, [activityId, record]) => {
+    const groups = ACTIVITY_DEFINITIONS[activityId]?.groups || [];
+    return total + (groups.includes(group) ? (record.total || 0) : 0);
+  }, 0);
+}
+
+function recordActivity(state, activityId, label) {
+  const history = normalizeActivityHistory(state.activityHistory);
+  const current = history.activities[activityId] || { total: 0, recent: [], label };
+  const entry = { day: state.day, slot: state.timeSlot, location: state.location };
+  return {
+    ...state,
+    activityHistory: {
+      activities: {
+        ...history.activities,
+        [activityId]: {
+          ...current,
+          label: label || current.label || activityId,
+          total: (current.total || 0) + 1,
+          recent: [...(current.recent || []), entry].slice(-12),
+        },
+      },
+    },
+  };
+}
+
+function getDiminishingFactor(recentCount) {
+  if (recentCount >= 2) return 0.5;
+  if (recentCount >= 1) return 0.75;
+  return 1;
+}
+
+function applyDiminishingReturns(changes, factor) {
+  if (!changes || factor >= 1) return changes || {};
+  return Object.fromEntries(Object.entries(changes).map(([key, delta]) => {
+    if (typeof delta !== "number" || delta <= 0) return [key, delta];
+    return [key, Math.max(1, Math.round(delta * factor))];
+  }));
+}
+
+function getGateFailure(state, gates = []) {
+  for (const gate of gates) {
+    const current = gate.kind === "stat"
+      ? state.player?.stats?.[gate.key]
+      : state.player?.resources?.[gate.key];
+    if (typeof current === "number" && current < gate.min) {
+      return {
+        ...gate,
+        current,
+        message: `${gate.label || gate.key} ${gate.min} needed; current ${current}.`,
+      };
+    }
+  }
+  return null;
+}
+
+function statResourceDiff(before, after) {
+  const feedback = [];
+  for (const [stat, label] of Object.entries(STAT_LABELS)) {
+    const beforeValue = before.player?.stats?.[stat] || 0;
+    const afterValue = after.player?.stats?.[stat] || 0;
+    const delta = afterValue - beforeValue;
+    if (delta) feedback.push(`${label} ${delta > 0 ? "+" : ""}${delta}`);
+  }
+
+  const resourceLabels = { energy: "Energy", money: "Money" };
+  for (const [resource, label] of Object.entries(resourceLabels)) {
+    const beforeValue = before.player?.resources?.[resource] || 0;
+    const afterValue = after.player?.resources?.[resource] || 0;
+    const delta = afterValue - beforeValue;
+    if (delta) feedback.push(`${label} ${delta > 0 ? "+" : ""}${delta}`);
+  }
+
+  return feedback;
+}
+
+function applyRepeatedActivityTraits(state) {
+  let next = state;
+  const gained = [];
+  const existing = new Set(state.player?.traits || []);
+
+  for (const rule of REPEATED_ACTIVITY_TRAITS) {
+    if (existing.has(rule.trait)) continue;
+    const count = rule.groups.reduce((total, group) => total + countActivityGroup(next, group), 0);
+    if (count >= rule.threshold) {
+      next = addTrait(next, rule.trait);
+      gained.push(rule.trait);
+      existing.add(rule.trait);
+    }
+  }
+
+  return { state: next, gained };
+}
+
+function buildActivityFeedback(before, after, traitGains = [], diminished = false) {
+  const parts = statResourceDiff(before, after);
+  if (traitGains.length) parts.push(`Trait: ${traitGains.join(", ")}`);
+  if (diminished) parts.push("repeated recently, gains softened");
+  return parts.length ? parts.join("; ") : "No mechanical change.";
+}
+
 function getKnownNpc(state, key) {
   const directory = state.npcDirectory || {};
   return (
@@ -1178,89 +1475,54 @@ function noteMoment(note) {
   return formatMoment(note?.day, note?.slot);
 }
 
-function applyActivityOutcome(state, choice) {
-  let next = state;
-  let notification = null;
+function resolveActivity(state, choice, definition) {
+  const gateFailure = getGateFailure(state, definition.gates);
+  let next = recordActivity(state, choice.id, definition.label);
 
-  switch (choice.id) {
-    case "study_deep":
-      next = changeResources(changeStats(next, { knowledge: 4, grit: 1 }), { energy: -8 });
-      next = appendEvent(next, "Studied seriously at the library.");
-      break;
-    case "browse_stacks":
-      next = changeStats(next, { knowledge: 2, sensitivity: 1 });
-      next = appendEvent(next, "Wandered the library stacks and found a few promising books.");
-      break;
-    case "workout_weights":
-      next = changeResources(changeStats(next, { athletics: 4, grit: 2 }), { energy: -12 });
-      next = appendEvent(next, "Lifted weights at the gym.");
-      break;
-    case "workout_cardio":
-      next = changeResources(changeStats(next, { athletics: 3, grit: 1 }), { energy: -10 });
-      next = appendEvent(next, "Put in a cardio session at the gym.");
-      break;
-    case "trail_run":
-      next = changeResources(changeStats(next, { athletics: 3, grit: 1 }), { energy: -9 });
-      next = appendEvent(next, "Ran the creekside trail.");
-      break;
-    case "trail_walk":
-      next = changeStats(next, { sensitivity: 2, grit: 1 });
-      next = appendEvent(next, "Took a long walk on the running trail.");
-      break;
-    case "browse_flyers":
-      next = addTrait(changeStats(next, { charm: 1, knowledge: 1 }), "campus-curious");
-      next = appendEvent(next, "Browsed the student union flyer board.");
-      notification = { app: "Buzz", body: "A few campus events caught your eye." };
-      break;
-    case "people_watch":
-      next = changeStats(next, { sensitivity: 2, charm: 1 });
-      next = appendEvent(next, "People-watched in the student union.");
-      break;
-    case "eat_meal":
-      next = changeResources(next, { energy: 14, money: -4 });
-      next = appendEvent(next, "Ate a real meal at the dining hall.");
-      break;
-    case "sit_with_strangers":
-      next = changeResources(changeStats(next, { charm: 2 }), { energy: 6 });
-      next = appendEvent(next, "Sat near a busy table and made a little small talk.");
-      break;
-    case "browse_books":
-      next = changeStats(next, { knowledge: 2, sensitivity: 1 });
-      next = appendEvent(next, "Browsed the back shelves at the bookstore.");
-      break;
-    case "buy_supplies":
-      next = changeResources(changeStats(next, { grit: 1 }), { money: -8 });
-      next = appendEvent(next, "Bought basic school supplies.");
-      break;
-    case "review_notes":
-      next = changeResources(changeStats(next, { knowledge: 3, grit: 1 }), { energy: -5 });
-      next = appendEvent(next, "Reviewed class notes in the dorm room.");
-      break;
-    case "tidy_room":
-      next = changeResources(changeStats(next, { grit: 1 }), { energy: -3 });
-      next = appendEvent(next, "Put the dorm room in better order.");
-      break;
-    case "sit_window":
-      next = changeResources(changeStats(next, { knowledge: 2 }), { energy: 2, money: -3 });
-      next = appendEvent(next, "Studied for a while in the coffee shop window booth.");
-      break;
-    case "chat_counter":
-      next = changeStats(next, { charm: 2, sensitivity: 1 });
-      next = appendEvent(next, "Chatted with Mari at the coffee shop counter.", ["studious"]);
-      next = changeRelationship(next, "studious", 1, "friendly", {
-        removeFlags: ["awkward"],
-        moment: makeRelationshipMoment(next, "Chatted with Mari at the coffee shop counter."),
-        lastSeenDisposition: "Warmer at the counter; willing to linger a little.",
-      });
-      break;
-    case "leave":
-      next = appendEvent(next, "Decided not to linger.");
-      break;
-    default:
-      return { state: next, notification };
+  if (gateFailure) {
+    const text = `${definition.label}: ${gateFailure.message}`;
+    next = appendEvent(next, `Tried ${definition.label.toLowerCase()}, but ${gateFailure.message.toLowerCase()}`);
+    return {
+      state: next,
+      notification: { app: "Self", body: text },
+    };
   }
 
+  const before = next;
+  const recentCount = countRecentActivity(state, choice.id);
+  const diminishingFactor = getDiminishingFactor(recentCount);
+  const statChanges = applyDiminishingReturns(definition.stats, diminishingFactor);
+
+  if (definition.stats) next = changeStats(next, statChanges);
+  if (definition.resources) next = changeResources(next, definition.resources);
+
+  if (definition.relationship) {
+    next = changeRelationship(next, definition.relationship.npcId, definition.relationship.delta, definition.relationship.status, {
+      addFlags: definition.relationship.addFlags,
+      removeFlags: definition.relationship.removeFlags,
+      lastSeenDisposition: definition.relationship.lastSeenDisposition,
+      moment: makeRelationshipMoment(next, definition.relationship.momentText || definition.event),
+    });
+  }
+
+  const traitUpdate = applyRepeatedActivityTraits(next);
+  next = traitUpdate.state;
+  const feedback = buildActivityFeedback(before, next, traitUpdate.gained, diminishingFactor < 1);
+  next = appendEvent(next, `${definition.event} Result: ${feedback}.`, definition.witnesses || []);
+
+  const notification = definition.notification
+    ? { app: definition.notification.app, body: `${definition.notification.body} ${feedback}` }
+    : { app: "Self", body: feedback };
+
   return { state: next, notification };
+}
+
+function applyActivityOutcome(state, choice) {
+  const definition = ACTIVITY_DEFINITIONS[choice.id];
+  if (definition) return resolveActivity(state, choice, definition);
+
+  if (choice.id === "leave") return { state: appendEvent(state, "Decided not to linger.") };
+  return { state };
 }
 
 function getChoiceDurationChunks(choice) {
@@ -2324,6 +2586,9 @@ function RosterApp({ state, onBack }) {
 
 function SelfApp({ state, onBack }) {
   const { stats, resources } = state.player;
+  const activityRows = Object.entries(normalizeActivityHistory(state.activityHistory).activities)
+    .sort((a, b) => (b[1].total || 0) - (a[1].total || 0))
+    .slice(0, 5);
   const StatRow = ({ label, value, max = 100 }) => (
     <div style={{ marginBottom: 10 }}>
       <div style={{
@@ -2388,6 +2653,33 @@ function SelfApp({ state, onBack }) {
             <span style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No traits recorded yet.</span>
           )}
         </div>
+      </div>
+      <div style={{ marginTop: 18 }}>
+        <div style={{
+          fontSize: 10, letterSpacing: 1.5, textTransform: "uppercase",
+          color: "#8b6f3d", fontWeight: 600, marginBottom: 8,
+        }}>Activity Patterns</div>
+        {activityRows.length ? (
+          <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            {activityRows.map(([activityId, record]) => (
+              <div key={activityId} style={{
+                display: "flex",
+                justifyContent: "space-between",
+                gap: 8,
+                padding: "7px 9px",
+                border: "1px solid rgba(58,53,48,0.08)",
+                borderRadius: 8,
+                background: "rgba(58,53,48,0.03)",
+                fontSize: 11,
+              }}>
+                <span>{record.label || ACTIVITY_DEFINITIONS[activityId]?.label || activityId}</span>
+                <span style={{ color: "#8b6f3d", fontWeight: 700 }}>{record.total}</span>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <span style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No repeated patterns yet.</span>
+        )}
       </div>
     </AppShell>
   );
