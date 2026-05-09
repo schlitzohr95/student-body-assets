@@ -204,7 +204,7 @@ const APPS = [
   { id: "margin",  label: "Margin",  role: "Notes",       layout: "portrait",  impl: true  },
   { id: "lens",    label: "Lens",    role: "Camera",      layout: "landscape", impl: false },
   { id: "wake",    label: "Wake",    role: "Alarm",       layout: "portrait",  impl: true  },
-  { id: "beacon",  label: "Beacon",  role: "Browser",     layout: "landscape", impl: false },
+  { id: "beacon",  label: "Beacon",  role: "World packs", layout: "landscape", impl: true  },
 ];
 
 const APP_BY_ID = Object.fromEntries(APPS.map(a => [a.id, a]));
@@ -241,6 +241,8 @@ function makeFreshState() {
     eventLog: [],
     activityHistory: { activities: {} },
     academicTests: { completed: {} },
+    worldPackId: "core_campus",
+    world: normalizeWorldPack(WORLD_PACKS.core_campus),
     wake: { alarmSlot: timeChunk(7, 30), lastSleep: null },
   };
 }
@@ -277,6 +279,8 @@ function normalizeState(state) {
     eventLog: migrateTimedRecords(state.eventLog, legacyTimeScale),
     activityHistory: normalizeActivityHistory(state.activityHistory),
     academicTests: normalizeAcademicTests(state.academicTests),
+    worldPackId: state.worldPackId || state.world?.id || fresh.worldPackId,
+    world: normalizeWorldPack(state.world || fresh.world),
     wake: {
       ...fresh.wake,
       ...(state.wake || {}),
@@ -327,6 +331,176 @@ const NPC_WEEKLY_SCHEDULES = {
   ],
 };
 
+const WORLD_PACKS = {
+  core_campus: {
+    id: "core_campus",
+    label: "Core Campus",
+    summary: "The authored baseline: first-year campus, town edge, Mari, Marcus, and semester scaffolding.",
+    locations: {},
+    locationDescriptions: {},
+    npcs: {},
+    npcSchedules: {},
+    arcs: [
+      {
+        id: "first_week_footing",
+        title: "First Week Footing",
+        summary: "Settle into routines, learn the map, and find a few people worth remembering.",
+        beats: [
+          { label: "Find a regular study place", location: "library_main", week: 1, dayIndex: 0, start: "13:00" },
+          { label: "Notice the Student Union flyer board", location: "student_union", week: 1, dayIndex: 0, start: "15:00" },
+          { label: "Keep one contact warm by text", location: "dorm_room", week: 1, dayIndex: 1, start: "20:00" },
+        ],
+      },
+    ],
+  },
+  arts_annex: {
+    id: "arts_annex",
+    label: "Arts Annex",
+    summary: "Adds the campus arts wing, radio booth, greenhouse studio, and a small creative-social arc.",
+    initialKnownNpcIds: ["jules"],
+    locations: {
+      arts_annex: { label: "Arts Annex", cat: "campus", backgroundKey: "student_union", hours: { open: "8:00", close: "23:00" } },
+      radio_station: { label: "Radio Station", cat: "campus", backgroundKey: "library_stacks", hours: { open: "14:00", close: "24:00" } },
+      greenhouse_studio: { label: "Greenhouse Studio", cat: "outdoor", backgroundKey: "park", hours: { open: "9:00", close: "19:00" } },
+    },
+    locationDescriptions: {
+      arts_annex: "A converted wing full of rehearsal rooms, paint smell, old couches, and flyers layered over flyers.",
+      radio_station: "A narrow booth with a red ON AIR light, battered headphones, and shelves of labeled local records.",
+      greenhouse_studio: "A warm glass room behind the science building where art students sketch plants under filtered light.",
+    },
+    npcs: {
+      jules: {
+        id: "jules",
+        name: "Jules",
+        portraitKey: "roommate",
+        archetype: "Scene Connector",
+        role: "Lit mag layout editor and arts-annex regular",
+        defaultLocation: "arts_annex",
+        schema: {
+          ageBand: "adult peer",
+          publicFace: "Bright, overcommitted, funny in a way that hides deadlines.",
+          voice: "Fast and specific; asks practical questions before emotional ones.",
+          wants: ["A reliable layout night", "People who show up when they say they will"],
+          whatLands: ["Concrete help", "Good taste without grandstanding", "Remembering deadlines"],
+          whatFallsFlat: ["Flaking", "Performative artsiness", "Treating creative work as easy"],
+          boundaries: ["Deadlines are not vibes", "Friendship does not mean free labor"],
+        },
+        currentMood: "Cheerfully stressed, scanning for useful allies.",
+        lastSeenDisposition: "Recognizes you as a possible helper.",
+      },
+      sana: {
+        id: "sana",
+        name: "Sana",
+        portraitKey: "studious",
+        archetype: "Quiet Producer",
+        role: "Late-night radio host",
+        defaultLocation: "radio_station",
+        schema: {
+          ageBand: "adult peer",
+          publicFace: "Soft-spoken until the mic is on, then precise and dry.",
+          voice: "Low-key, observant, occasionally devastating with one sentence.",
+          wants: ["A show that feels less lonely", "Listeners who hear the details"],
+          whatLands: ["Specific music curiosity", "Respecting silence", "Showing up late without making noise"],
+          whatFallsFlat: ["Demanding instant intimacy", "Mocking niche interests"],
+          boundaries: ["The booth is her workspace", "Private recordings stay private"],
+        },
+        currentMood: "Guarded but interested in anyone who listens carefully.",
+        lastSeenDisposition: "Unknown beyond the radio booth.",
+      },
+    },
+    npcSchedules: {
+      jules: [
+        { days: [0, 2, 4], start: "14:00", end: "17:00", location: "arts_annex", note: "layout table" },
+        { days: [1, 3], start: "18:00", end: "20:00", location: "greenhouse_studio", note: "sketching plants" },
+        { days: [5], start: "15:00", end: "17:00", location: "coffee_shop", note: "deadline coffee" },
+      ],
+      sana: [
+        { days: [1, 3], start: "20:00", end: "22:00", location: "radio_station", note: "on air" },
+        { days: [2], start: "16:00", end: "18:00", location: "arts_annex", note: "pulling music for a segment" },
+        { days: [6], start: "10:00", end: "11:00", location: "greenhouse_studio", note: "quiet recording walk" },
+      ],
+    },
+    arcs: [
+      {
+        id: "lit_mag_deadline",
+        title: "Lit Mag Deadline",
+        summary: "Jules needs reliable help before the first issue goes to print.",
+        beats: [
+          { label: "Meet Jules at the layout table", npcId: "jules", location: "arts_annex", week: 1, dayIndex: 0, start: "14:00" },
+          { label: "Bring a polished note or photo idea", npcId: "jules", location: "greenhouse_studio", week: 1, dayIndex: 3, start: "18:00" },
+          { label: "Late layout push", npcId: "jules", location: "arts_annex", week: 1, dayIndex: 4, start: "16:00" },
+        ],
+      },
+      {
+        id: "radio_after_hours",
+        title: "Radio After Hours",
+        summary: "Sana's late show becomes a thread for campus rumors, music, and quiet confidences.",
+        beats: [
+          { label: "Hear Sana on air", npcId: "sana", location: "radio_station", week: 1, dayIndex: 1, start: "20:00" },
+          { label: "Suggest a track", npcId: "sana", location: "radio_station", week: 1, dayIndex: 3, start: "20:00" },
+        ],
+      },
+    ],
+  },
+  town_after_dark: {
+    id: "town_after_dark",
+    label: "Town After Dark",
+    summary: "Adds evening town locations, service-work schedules, and a town/campus boundary arc.",
+    initialKnownNpcIds: ["elliot"],
+    locations: {
+      record_store: { label: "Record Store", cat: "town", backgroundKey: "bookstore", hours: { open: "12:00", close: "21:00" } },
+      late_bus_stop: { label: "Late Bus Stop", cat: "town", backgroundKey: "walking_path", hours: { alwaysOpen: true } },
+      laundromat: { label: "Laundromat", cat: "town", backgroundKey: "restaurant", hours: { open: "6:00", close: "24:00" } },
+    },
+    locationDescriptions: {
+      record_store: "A narrow shop with hand-written dividers, a listening station, and regulars who pretend not to judge.",
+      late_bus_stop: "A lit shelter at the edge of town where campus feels suddenly less protected.",
+      laundromat: "Warm machines, plastic chairs, vending-machine snacks, and the washed-out quiet of other people's errands.",
+    },
+    npcs: {
+      elliot: {
+        id: "elliot",
+        name: "Elliot",
+        portraitKey: "roommate",
+        archetype: "Town Regular",
+        role: "Record store clerk and night bus expert",
+        defaultLocation: "record_store",
+        schema: {
+          ageBand: "adult peer",
+          publicFace: "Laid-back, amused, protective of town routines.",
+          voice: "Dry, patient, skeptical of campus assumptions.",
+          wants: ["Customers who listen", "Students who understand town has its own life"],
+          whatLands: ["Humility", "Music curiosity", "Paying attention to transit realities"],
+          whatFallsFlat: ["Campus entitlement", "Using town as scenery"],
+          boundaries: ["Work hours are work hours", "His friends are not content"],
+        },
+        currentMood: "Relaxed behind the counter, more observant than he lets on.",
+        lastSeenDisposition: "Knows you only as a campus face.",
+      },
+    },
+    npcSchedules: {
+      elliot: [
+        { days: [0, 1, 2, 3, 4], start: "16:00", end: "21:00", location: "record_store", note: "closing shift" },
+        { days: [1, 3], start: "21:15", end: "21:45", location: "late_bus_stop", note: "waiting after work" },
+        { days: [6], start: "11:00", end: "12:30", location: "laundromat", note: "weekly laundry" },
+      ],
+    },
+    arcs: [
+      {
+        id: "last_bus",
+        title: "Last Bus",
+        summary: "Learn how evening travel changes who can show up, who gets stuck, and who plans ahead.",
+        beats: [
+          { label: "Ask Elliot about the late route", npcId: "elliot", location: "record_store", week: 1, dayIndex: 1, start: "18:00" },
+          { label: "Catch the late bus instead of walking", npcId: "elliot", location: "late_bus_stop", week: 1, dayIndex: 3, start: "21:15" },
+        ],
+      },
+    ],
+  },
+};
+
+const WORLD_PACK_LIST = Object.values(WORLD_PACKS);
+
 function timeChunk(hour, minute = 0) {
   if (hour >= 24) return CHUNKS_PER_DAY;
   const totalMinutes = Math.max(0, Math.min((24 * 60) - TIME_CHUNK_MINUTES, (hour * 60) + minute));
@@ -371,6 +545,188 @@ function addChunksToMoment(day = 1, slot = 0, chunks = 0) {
   return {
     day: Math.floor(bounded / CHUNKS_PER_DAY) + 1,
     slot: bounded % CHUNKS_PER_DAY,
+  };
+}
+
+function parsePackTime(value, fallback = timeChunk(8)) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return value >= CHUNKS_PER_DAY ? CHUNKS_PER_DAY : normalizeTimeSlot(value);
+  }
+  if (typeof value === "string") {
+    const match = value.trim().match(/^(\d{1,2})(?::(\d{2}))?$/);
+    if (match) {
+      const hour = Number(match[1]);
+      const minute = Number(match[2] || 0);
+      if (Number.isFinite(hour) && Number.isFinite(minute)) return timeChunk(hour, minute);
+    }
+  }
+  return fallback;
+}
+
+function normalizePackHours(hours) {
+  if (!hours || typeof hours !== "object") return null;
+  if (hours.alwaysOpen) return { alwaysOpen: true };
+  return {
+    open: parsePackTime(hours.open, timeChunk(7)),
+    close: parsePackTime(hours.close, timeChunk(22)),
+  };
+}
+
+function objectFromPackCollection(collection = {}) {
+  if (Array.isArray(collection)) {
+    return Object.fromEntries(collection
+      .map(item => {
+        const id = item?.id || item?.key || item?.name;
+        return id ? [id, { ...item, id }] : null;
+      })
+      .filter(Boolean));
+  }
+  if (!collection || typeof collection !== "object") return {};
+  return Object.fromEntries(Object.entries(collection).map(([id, value]) => [
+    id,
+    value && typeof value === "object" ? { ...value, id: value.id || id } : value,
+  ]));
+}
+
+function normalizePackScheduleEntries(entries = []) {
+  if (!Array.isArray(entries)) return [];
+  return entries
+    .filter(entry => entry && typeof entry === "object")
+    .map(entry => ({
+      ...entry,
+      start: parsePackTime(entry.start ?? entry.slot, timeChunk(8)),
+      end: parsePackTime(entry.end, parsePackTime(entry.start ?? entry.slot, timeChunk(8)) + 4),
+      slot: typeof entry.slot === "undefined" ? parsePackTime(entry.start, timeChunk(8)) : parsePackTime(entry.slot, timeChunk(8)),
+      days: Array.isArray(entry.days) ? entry.days : entry.dayIndex != null ? [entry.dayIndex] : entry.days,
+    }));
+}
+
+function normalizePackArcs(arcs = []) {
+  const source = Array.isArray(arcs)
+    ? arcs
+    : Object.entries(arcs || {}).map(([id, arc]) => ({ ...(arc || {}), id: arc?.id || id }));
+  return source
+    .filter(arc => arc && typeof arc === "object")
+    .map(arc => ({
+      ...arc,
+      id: arc.id || arc.title || "world_arc",
+      beats: asArray(arc.beats).map(beat => ({
+        ...beat,
+        start: parsePackTime(beat.start ?? beat.slot, timeChunk(12)),
+      })),
+    }));
+}
+
+function normalizeWorldPack(pack = {}) {
+  const source = pack && typeof pack === "object" ? pack : {};
+  const rawLocations = objectFromPackCollection(source.locations);
+  const locations = Object.fromEntries(Object.entries(rawLocations).map(([id, location]) => [
+    id,
+    {
+      ...location,
+      id,
+      label: location?.label || location?.name || id,
+      cat: location?.cat || location?.category || "campus",
+      hours: normalizePackHours(location?.hours),
+    },
+  ]));
+  const npcs = objectFromPackCollection(source.npcs || source.characters);
+  const npcSchedules = Object.fromEntries(Object.entries(source.npcSchedules || source.schedules || {}).map(([npcId, entries]) => [
+    npcId,
+    normalizePackScheduleEntries(entries),
+  ]));
+
+  return {
+    id: source.id || "custom_pack",
+    label: source.label || source.name || "Custom Pack",
+    summary: source.summary || source.description || "",
+    defaultLocation: source.defaultLocation,
+    locations,
+    locationDescriptions: source.locationDescriptions || source.descriptions || {},
+    npcs,
+    npcSchedules,
+    arcs: normalizePackArcs(source.arcs),
+    initialKnownNpcIds: uniqueCompact(source.initialKnownNpcIds || source.knownNpcIds || source.npcsKnown || []),
+    raw: source.raw,
+  };
+}
+
+function getLocationDirectory(state) {
+  return {
+    ...LOCATIONS,
+    ...(state?.world?.locations || {}),
+    ...(state?.locations || {}),
+  };
+}
+
+function getLocationMeta(state, locationKey) {
+  return getLocationDirectory(state)[locationKey] || { id: locationKey, label: locationKey, cat: "campus" };
+}
+
+function getLocationLabel(state, locationKey) {
+  return getLocationMeta(state, locationKey)?.label || locationKey;
+}
+
+function getLocationDescription(state, locationKey) {
+  return (
+    state?.world?.locationDescriptions?.[locationKey] ||
+    LOCATION_DESCRIPTIONS[locationKey] ||
+    getLocationMeta(state, locationKey)?.description ||
+    "No static description recorded yet."
+  );
+}
+
+function getWorldArcs(state) {
+  return asArray(state?.world?.arcs);
+}
+
+function getUpcomingArcBeats(state, limit = 5) {
+  const now = absoluteMoment(state.day, state.timeSlot);
+  return getWorldArcs(state).flatMap(arc => (
+    asArray(arc.beats).map((beat, index) => {
+      const week = beat.week || getWeekNumber(state.day);
+      const dayIndex = beat.dayIndex ?? getDayIndex(state.day);
+      const day = ((week - 1) * DAY_LABELS.length) + dayIndex + 1;
+      return {
+        ...beat,
+        id: `${arc.id}-${index}`,
+        arcId: arc.id,
+        arcTitle: arc.title,
+        day,
+        slot: parsePackTime(beat.start ?? beat.slot, timeChunk(12)),
+      };
+    })
+  ))
+    .filter(beat => absoluteMoment(beat.day, beat.slot) >= now)
+    .sort((a, b) => absoluteMoment(a.day, a.slot) - absoluteMoment(b.day, b.slot))
+    .slice(0, limit);
+}
+
+function getWorldPackById(packId) {
+  return WORLD_PACKS[packId] || null;
+}
+
+function applyWorldPack(state, packInput) {
+  const pack = normalizeWorldPack(typeof packInput === "string" ? getWorldPackById(packInput) : packInput);
+  if (!pack.id) return { state };
+  const baseNpcIds = new Set(Object.keys(STARTER_NPCS));
+  const nextPackNpcIds = new Set(Object.keys(pack.npcs || {}));
+  const relationships = state.player?.relationships || {};
+  const retainedKnown = (state.npcsKnown || []).filter(npcId => (
+    baseNpcIds.has(npcId) || nextPackNpcIds.has(npcId) || relationships[npcId]
+  ));
+  const availableLocations = { ...LOCATIONS, ...(pack.locations || {}) };
+  let next = {
+    ...state,
+    worldPackId: pack.id,
+    world: pack,
+    location: availableLocations[state.location] ? state.location : (pack.defaultLocation || "dorm_room"),
+    npcsKnown: uniqueCompact([...retainedKnown, ...pack.initialKnownNpcIds]),
+  };
+  next = appendEvent(next, `Loaded world pack: ${pack.label}.`);
+  return {
+    state: next,
+    notification: { app: "Beacon", body: `${pack.label} loaded.` },
   };
 }
 
@@ -518,7 +874,11 @@ function getNpcScheduleMatches(state, npc, locationKey = null) {
   if (!npc) return [];
   const moment = getCalendarMoment(state);
   const npcId = npc.id || npc.portraitKey || npc.name;
-  const schedule = state?.npcSchedules?.[npcId] || NPC_WEEKLY_SCHEDULES[npcId] || [];
+  const schedule = [
+    ...(NPC_WEEKLY_SCHEDULES[npcId] || []),
+    ...(state?.world?.npcSchedules?.[npcId] || []),
+    ...(state?.npcSchedules?.[npcId] || []),
+  ];
   return schedule.filter(entry => (
     scheduleMatchesMoment(entry, moment) &&
     (!locationKey || entry.location === locationKey)
@@ -534,8 +894,8 @@ function getNpcPresenceAtLocation(state, locationKey, directory = getNpcDirector
     .filter(Boolean);
 }
 
-function describeScheduleItem(item) {
-  const place = LOCATIONS[item.location]?.label || item.location;
+function describeScheduleItem(item, state = null) {
+  const place = getLocationLabel(state, item.location);
   const end = typeof item.end === "number" ? `-${formatClockTime(item.end)}` : "";
   return `${formatClockTime(item.slot)}${end}: ${item.title} at ${place}`;
 }
@@ -755,13 +1115,13 @@ function buildNarratorContext(state, action) {
   const rawTimeSlot = state?.timeSlot ?? state?.slot ?? 0;
   const timeSlot = typeof rawTimeSlot === "number" ? formatTimeOfDay(rawTimeSlot) : rawTimeSlot;
   const locationKey = getLocationKey(state);
-  const location = LOCATIONS[locationKey] || { label: locationKey };
-  const locationDescription = LOCATION_DESCRIPTIONS[locationKey] || "No static description recorded yet.";
+  const location = getLocationMeta(state, locationKey);
+  const locationDescription = getLocationDescription(state, locationKey);
   const npcDirectory = getNpcDirectory(state);
   const presentNpcs = getPresentNpcs(state, npcDirectory).filter(Boolean);
   const currentCalendarItems = getCurrentCalendarItems(state);
   const currentCalendarText = currentCalendarItems.length
-    ? currentCalendarItems.map(describeScheduleItem).join("; ")
+    ? currentCalendarItems.map(item => describeScheduleItem(item, state)).join("; ")
     : "Free block; no required calendar item in this slot.";
   const actionText = typeof action === "string"
     ? action.trim()
@@ -1800,12 +2160,10 @@ function buildActivityFeedback(before, after, traitGains = [], diminished = fals
 }
 
 function getKnownNpc(state, key) {
-  const directory = state.npcDirectory || {};
+  const directory = getNpcDirectory(state);
   return (
     directory[key] ||
-    STARTER_NPCS[key] ||
     Object.values(directory).find(npc => npc.portraitKey === key || npc.id === key || npc.name === key) ||
-    Object.values(STARTER_NPCS).find(npc => npc.portraitKey === key || npc.id === key) ||
     { id: key, name: key, portraitKey: key, role: "Contact" }
   );
 }
@@ -2086,10 +2444,10 @@ function getChoiceDurationChunks(choice) {
   return durations[choice?.id] || DEFAULT_ACTION_CHUNKS;
 }
 
-function getTravelDurationChunks(fromLocation, toLocation) {
+function getTravelDurationChunks(fromLocation, toLocation, state = null) {
   if (!fromLocation || !toLocation || fromLocation === toLocation) return 0;
-  const fromCat = LOCATIONS[fromLocation]?.cat;
-  const toCat = LOCATIONS[toLocation]?.cat;
+  const fromCat = getLocationMeta(state, fromLocation)?.cat;
+  const toCat = getLocationMeta(state, toLocation)?.cat;
   if (fromCat === "campus" && toCat === "campus") return 1;
   if (fromCat === toCat) return 2;
   if ((fromCat === "campus" && toCat === "town") || (fromCat === "town" && toCat === "campus")) return 2;
@@ -2098,7 +2456,7 @@ function getTravelDurationChunks(fromLocation, toLocation) {
 
 function getTravelPlan(state, locationKey, transitMode = "walk") {
   const mode = TRANSIT_MODES[transitMode] || TRANSIT_MODES.walk;
-  const baseChunks = getTravelDurationChunks(state.location, locationKey);
+  const baseChunks = getTravelDurationChunks(state.location, locationKey, state);
   const chunks = baseChunks === 0 ? 0 : Math.max(mode.minChunks, Math.ceil(baseChunks * mode.timeFactor));
   const energyCost = Math.max(0, Math.ceil(chunks * mode.energyPerChunk));
   const hasTicket = mode.ticketItem && getInventoryQty(state, mode.ticketItem) > 0;
@@ -2134,8 +2492,11 @@ function describeTravelPlan(plan) {
   return parts.join(" / ");
 }
 
-function getLocationHours(locationKey) {
-  return LOCATION_HOURS[locationKey] || { open: timeChunk(7), close: timeChunk(22) };
+function getLocationHours(stateOrLocationKey, maybeLocationKey = null) {
+  const state = typeof stateOrLocationKey === "object" ? stateOrLocationKey : null;
+  const locationKey = maybeLocationKey || stateOrLocationKey;
+  const packHours = getLocationMeta(state, locationKey)?.hours;
+  return packHours || LOCATION_HOURS[locationKey] || { open: timeChunk(7), close: timeChunk(22) };
 }
 
 function isSlotWithinHours(slot, hours) {
@@ -2150,11 +2511,11 @@ function isSlotWithinHours(slot, hours) {
 }
 
 function isLocationOpenAt(state, locationKey, slot = state.timeSlot) {
-  return isSlotWithinHours(slot, getLocationHours(locationKey));
+  return isSlotWithinHours(slot, getLocationHours(state, locationKey));
 }
 
-function formatLocationHours(locationKey) {
-  const hours = getLocationHours(locationKey);
+function formatLocationHours(stateOrLocationKey, maybeLocationKey = null) {
+  const hours = getLocationHours(stateOrLocationKey, maybeLocationKey);
   if (hours.alwaysOpen) return "always open";
   return `${formatClockTime(hours.open)}-${formatClockTime(hours.close)}`;
 }
@@ -2166,9 +2527,9 @@ function describeLocationOpenState(state, locationKey) {
 
 function navigateToLocation(state, locationKey, transitMode = "walk") {
   if (state.location === locationKey) return { state };
-  const destination = LOCATIONS[locationKey]?.label || locationKey;
+  const destination = getLocationLabel(state, locationKey);
   if (!isLocationOpenAt(state, locationKey)) {
-    const hours = formatLocationHours(locationKey);
+    const hours = formatLocationHours(state, locationKey);
     return {
       state: appendEvent(state, `Could not travel to ${destination}: closed (${hours}).`),
       notification: { app: "Compass", body: `${destination} is closed right now (${hours}).` },
@@ -2450,7 +2811,7 @@ function generateDailyBuzzPosts(state) {
     posts.push(makeBuzzPost(state, "scheduled", fillBuzzTemplate(template, {
       title: item.title,
       time: formatClockTime(item.slot),
-      place: LOCATIONS[item.location]?.label || item.location,
+      place: getLocationLabel(state, item.location),
     }), { id: item.id, index, dayKey, day: item.day || state.day, slot: item.slot, location: item.location, relatedId: item.id }));
   });
 
@@ -2458,7 +2819,7 @@ function generateDailyBuzzPosts(state) {
     const template = BUZZ_POST_TEMPLATES.bulletin[index % BUZZ_POST_TEMPLATES.bulletin.length];
     posts.push(makeBuzzPost(state, "bulletin", fillBuzzTemplate(template, {
       title: flyer.title,
-      place: LOCATIONS[flyer.location]?.label || flyer.location,
+      place: getLocationLabel(state, flyer.location),
     }), { id: flyer.id, index: index + 10, dayKey, day: state.day, slot: state.timeSlot, location: flyer.location, relatedId: flyer.id }));
   });
 
@@ -2466,7 +2827,7 @@ function generateDailyBuzzPosts(state) {
     const template = BUZZ_POST_TEMPLATES.npc[index % BUZZ_POST_TEMPLATES.npc.length];
     posts.push(makeBuzzPost(state, "npc", fillBuzzTemplate(template, {
       name: npc.name || npc.id,
-      place: LOCATIONS[state.location]?.label || state.location,
+      place: getLocationLabel(state, state.location),
     }), { id: npc.id, index: index + 20, dayKey, location: state.location, relatedId: npc.id, author: "Seen Around" }));
   });
 
@@ -2560,9 +2921,10 @@ function getAnthropLeads(state) {
   const commitments = getUpcomingCommitments(state, 3);
   const currentRequired = getCurrentCalendarItems(state).filter(item => item.required);
   const upcomingTests = getUpcomingTestItems(state, 2);
+  const upcomingArcBeats = getUpcomingArcBeats(state, 2);
   const presentHere = getNpcPresenceAtLocation(state, state.location, getNpcDirectory(state));
   if (unread) leads.push({ id: "unread", title: `${unread} unread Pulse message${unread === 1 ? "" : "s"}`, detail: "Texting is live enough to decay if ignored." });
-  currentRequired.forEach(item => leads.push({ id: `class-${item.id}`, title: item.title, detail: `Happening now at ${LOCATIONS[item.location]?.label || item.location}.` }));
+  currentRequired.forEach(item => leads.push({ id: `class-${item.id}`, title: item.title, detail: `Happening now at ${getLocationLabel(state, item.location)}.` }));
   upcomingTests.forEach(item => {
     const prep = getStudyPrepDetails(state, item);
     leads.push({
@@ -2571,7 +2933,12 @@ function getAnthropLeads(state) {
       detail: `${formatMoment(item.day, item.slot)}. Prep ${prep.score}/100 (${prep.tier}).`,
     });
   });
-  commitments.forEach(item => leads.push({ id: item.id, title: item.title, detail: `${formatMoment(item.day, item.slot)} at ${LOCATIONS[item.location]?.label || item.location}.` }));
+  upcomingArcBeats.forEach(beat => leads.push({
+    id: `arc-${beat.id}`,
+    title: beat.arcTitle,
+    detail: `${beat.label} at ${getLocationLabel(state, beat.location)} on ${formatMoment(beat.day, beat.slot)}.`,
+  }));
+  commitments.forEach(item => leads.push({ id: item.id, title: item.title, detail: `${formatMoment(item.day, item.slot)} at ${getLocationLabel(state, item.location)}.` }));
   presentHere.forEach(npc => leads.push({ id: `npc-${npc.id}`, title: `${npc.name || npc.id} is here`, detail: npc.scheduleNote || "A possible in-person beat." }));
   if ((state.player?.resources?.energy || 0) < 25) leads.push({ id: "energy", title: "Energy is low", detail: "Wake, food, or coffee will matter before heavier plans." });
   return leads.slice(0, 6);
@@ -2669,7 +3036,7 @@ function addMarginNote(state, text, meta = {}) {
   const currentCalendarItems = getCurrentCalendarItems(state);
   const presentNpcs = getNpcPresenceAtLocation(state, state.location, getNpcDirectory(state));
   const recentEvent = (state.eventLog || []).slice(-1)[0];
-  const locationLabel = LOCATIONS[state.location]?.label || state.location;
+  const locationLabel = getLocationLabel(state, state.location);
 
   const note = {
     id: `${state.day}-${state.timeSlot}-${Date.now()}`,
@@ -2856,10 +3223,10 @@ function getScriptedScene(state) {
     };
   }
 
-  const loc = LOCATIONS[location];
+  const loc = getLocationMeta(state, location);
   const partOfDay = getDaypartLabel(timeSlot).toLowerCase();
   return {
-    narration: `${loc?.label || "Here"}. ${partOfDay}, day ${day}. The semester keeps moving around you.`,
+    narration: `${loc?.label || "Here"}. ${getLocationDescription(state, location)} ${partOfDay}, day ${day}. The semester keeps moving around you.`,
     choices: [
       { id: "wait",  label: "Spend some time here" },
       { id: "leave", label: "Move on" },
@@ -2886,8 +3253,9 @@ function InlineSvg({ svg, style, className, onClick }) {
 // SCENE VIEW — the main image area + dialogue strip
 // ============================================================================
 
-function SceneImage({ locationKey }) {
-  const svg = LOC_SVGS[locationKey];
+function SceneImage({ state, locationKey }) {
+  const location = getLocationMeta(state, locationKey);
+  const svg = LOC_SVGS[locationKey] || LOC_SVGS[location.backgroundKey];
   return (
     <div style={{
       position: "absolute", inset: 0, overflow: "hidden",
@@ -3000,7 +3368,7 @@ function HeaderBar({ state, onNewGame }) {
       <span style={{ color: PAL.inkSoft }}>·</span>
       <span style={{ color: PAL.inkDim }}>{moment.slotLabel}</span>
       <span style={{ color: PAL.inkSoft }}>·</span>
-      <span style={{ color: PAL.inkDim }}>{LOCATIONS[state.location]?.label || state.location}</span>
+      <span style={{ color: PAL.inkDim }}>{getLocationLabel(state, state.location)}</span>
       <button
         onClick={onNewGame}
         style={{
@@ -3340,6 +3708,7 @@ function CompassApp({ state, onBack, onNavigate, onCommitBulletin }) {
   ];
   const here = state.location;
   const directory = getNpcDirectory(state);
+  const locationDirectory = getLocationDirectory(state);
   const bulletinItems = state.location === "student_union" ? getBulletinItems(state) : [];
   const upcomingCommitments = getUpcomingCommitments(state, 8);
 
@@ -3398,7 +3767,7 @@ function CompassApp({ state, onBack, onNavigate, onCommitBulletin }) {
                   <div style={{ color: "#f0ebdc", fontSize: 12, fontWeight: 700, lineHeight: 1.25 }}>{item.title}</div>
                   <p style={{ margin: 0, color: "rgba(240,235,220,0.70)", fontSize: 10, lineHeight: 1.35, flex: 1 }}>{item.body}</p>
                   <div style={{ color: "#c8a165", fontSize: 9 }}>
-                    {formatMoment(item.day, item.slot)} · {LOCATIONS[item.location]?.label || item.location}
+                    {formatMoment(item.day, item.slot)} · {getLocationLabel(state, item.location)}
                   </div>
                   <button
                     type="button"
@@ -3427,7 +3796,7 @@ function CompassApp({ state, onBack, onNavigate, onCommitBulletin }) {
         minHeight: 300,
       }}>
         {groups.map(g => {
-          const locs = Object.entries(LOCATIONS).filter(([_, v]) => v.cat === g.cat);
+          const locs = Object.entries(locationDirectory).filter(([_, v]) => v.cat === g.cat);
           return (
             <div key={g.cat} style={{
               border: "1px solid rgba(240,235,220,0.12)",
@@ -3457,7 +3826,7 @@ function CompassApp({ state, onBack, onNavigate, onCommitBulletin }) {
                       key={key}
                       onClick={() => !disabled && onNavigate(key, transitMode)}
                       disabled={disabled}
-                      title={travelFailure || `${describeLocationOpenState(state, key)} · ${formatLocationHours(key)}`}
+                      title={travelFailure || `${describeLocationOpenState(state, key)} · ${formatLocationHours(state, key)}`}
                       style={{
                         textAlign: "left",
                         padding: "8px 10px",
@@ -3483,7 +3852,7 @@ function CompassApp({ state, onBack, onNavigate, onCommitBulletin }) {
                           marginTop: 6,
                         }}>
                           {calendarHits.map(item => (
-                            <span key={`${item.id}-${item.slot}`} title={describeScheduleItem(item)} style={{
+                            <span key={`${item.id}-${item.slot}`} title={describeScheduleItem(item, state)} style={{
                               maxWidth: "100%",
                               overflow: "hidden",
                               textOverflow: "ellipsis",
@@ -3513,7 +3882,7 @@ function CompassApp({ state, onBack, onNavigate, onCommitBulletin }) {
                             color: "rgba(240,235,220,0.62)",
                             fontSize: 9,
                           }}>
-                            {formatLocationHours(key)}
+                            {formatLocationHours(state, key)}
                           </span>
                           {!isHere && travelPlan.chunks > 0 && (
                             <span style={{
@@ -4106,7 +4475,7 @@ function BuzzApp({ state, onBack }) {
     <AppShell title="Buzz" onBack={onBack} dark>
       <PhoneSection title="Campus Pulse" dark>
         <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: "#f0ebdc" }}>
-          {LOCATIONS[state.location]?.label || state.location} is in your current orbit. Cached posts update as time moves.
+          {getLocationLabel(state, state.location)} is in your current orbit. Cached posts update as time moves.
         </p>
       </PhoneSection>
       <PhoneSection title="Feed" dark>
@@ -4141,7 +4510,7 @@ function BuzzApp({ state, onBack }) {
                     color: "#bae6fd",
                     fontSize: 9,
                   }}>
-                    {LOCATIONS[post.location]?.label || post.location}
+                    {getLocationLabel(state, post.location)}
                   </span>
                 )}
               </div>
@@ -4193,12 +4562,14 @@ function AnthropApp({ state, onBack }) {
   const neglectedContacts = getNeglectedContacts(state);
   const significantMoments = getRecentSignificantMoments(state, 6);
   const missedBlocks = (state.missedBlocks || []).slice(-4).reverse();
+  const worldArcs = getWorldArcs(state);
+  const arcBeats = getUpcomingArcBeats(state, 5);
 
   return (
     <AppShell title="Anthrop" onBack={onBack} dark>
       <PhoneSection title="Readout" dark>
         <p style={{ margin: "0 0 8px", color: "#f0ebdc", fontSize: 13, lineHeight: 1.45 }}>
-          Week {moment.week}, {moment.dayName} {moment.slotLabel}, currently at {LOCATIONS[state.location]?.label || state.location}.
+          Week {moment.week}, {moment.dayName} {moment.slotLabel}, currently at {getLocationLabel(state, state.location)}.
           Your strongest stat is {STAT_LABELS[strong] || strong} and the easiest gain right now is probably {STAT_LABELS[weak] || weak}.
         </p>
         <p style={{ margin: 0, color: "rgba(240,235,220,0.72)", fontSize: 12 }}>
@@ -4230,7 +4601,7 @@ function AnthropApp({ state, onBack }) {
             <div style={{ color: "#c8a165", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Now</div>
             {currentCalendarItems.length ? currentCalendarItems.map(item => (
               <p key={`${item.id}-${item.slot}`} style={{ margin: "0 0 5px", color: "#f0ebdc", fontSize: 12, lineHeight: 1.35 }}>
-                {item.title} at {LOCATIONS[item.location]?.label || item.location}
+                {item.title} at {getLocationLabel(state, item.location)}
               </p>
             )) : (
               <p style={{ margin: 0, color: "rgba(240,235,220,0.58)", fontSize: 12 }}>Free block.</p>
@@ -4248,7 +4619,7 @@ function AnthropApp({ state, onBack }) {
             <div style={{ color: "#c8a165", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Next Up</div>
             {upcomingItems.length ? upcomingItems.map(item => (
               <TimelineItem dark when={formatMoment(item.day, item.slot)} key={`${item.id}-${item.day}-${item.slot}`}>
-                {item.title} at {LOCATIONS[item.location]?.label || item.location}
+                {item.title} at {getLocationLabel(state, item.location)}
               </TimelineItem>
             )) : (
               <p style={{ margin: 0, color: "rgba(240,235,220,0.58)", fontSize: 12 }}>Nothing scheduled soon.</p>
@@ -4259,10 +4630,36 @@ function AnthropApp({ state, onBack }) {
       <PhoneSection title="Commitments" dark>
         {commitments.length ? commitments.map(item => (
           <TimelineItem dark when={formatMoment(item.day, item.slot)} key={item.id}>
-            {item.title} at {LOCATIONS[item.location]?.label || item.location}
+            {item.title} at {getLocationLabel(state, item.location)}
           </TimelineItem>
         )) : (
           <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>No tracked commitments yet.</p>
+        )}
+      </PhoneSection>
+      <PhoneSection title="World Arcs" dark>
+        {worldArcs.length ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <div style={{ color: "#c8a165", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Loaded</div>
+              {worldArcs.map(arc => (
+                <p key={arc.id} style={{ margin: "0 0 6px", color: "#f0ebdc", fontSize: 12, lineHeight: 1.35 }}>
+                  {arc.title}
+                </p>
+              ))}
+            </div>
+            <div>
+              <div style={{ color: "#c8a165", fontSize: 10, letterSpacing: 1, textTransform: "uppercase", marginBottom: 5 }}>Next Beats</div>
+              {arcBeats.length ? arcBeats.map(beat => (
+                <TimelineItem dark when={formatMoment(beat.day, beat.slot)} key={beat.id}>
+                  {beat.label} at {getLocationLabel(state, beat.location)}
+                </TimelineItem>
+              )) : (
+                <p style={{ margin: 0, color: "rgba(240,235,220,0.58)", fontSize: 12 }}>No upcoming beats.</p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>No authored arcs loaded.</p>
         )}
       </PhoneSection>
       <PhoneSection title="Neglected Contacts" dark>
@@ -4322,7 +4719,7 @@ function AnthropApp({ state, onBack }) {
         <PhoneSection title="Missed Blocks" dark>
           {missedBlocks.map(block => (
             <TimelineItem dark when={formatMoment(block.day, block.slot)} key={block.id}>
-              {block.title} at {LOCATIONS[block.location]?.label || block.location}
+              {block.title} at {getLocationLabel(state, block.location)}
             </TimelineItem>
           ))}
         </PhoneSection>
@@ -4419,7 +4816,7 @@ function MarginApp({ state, onBack, onAddNote }) {
       </PhoneSection>
       <PhoneSection title="Notes">
         {filteredNotes.length ? filteredNotes.map(note => (
-          <TimelineItem when={`${noteMoment(note)} · ${note.locationLabel || LOCATIONS[note.location]?.label || "Unknown place"}`} key={note.id}>
+          <TimelineItem when={`${noteMoment(note)} · ${note.locationLabel || getLocationLabel(state, note.location) || "Unknown place"}`} key={note.id}>
             <span>{note.text}</span>
             {(note.context || (note.tags || []).length || note.event) && (
               <span style={{ display: "block", marginTop: 6, color: "#7a6e58", fontSize: 10, lineHeight: 1.35 }}>
@@ -4532,11 +4929,165 @@ function WakeApp({ state, onBack, onSetAlarm, onSleep }) {
       <PhoneSection title="Missed Blocks">
         {missedBlocks.length ? missedBlocks.map(block => (
           <TimelineItem when={formatMoment(block.day, block.slot)} key={block.id}>
-            {block.title} at {LOCATIONS[block.location]?.label || block.location}
+            {block.title} at {getLocationLabel(state, block.location)}
           </TimelineItem>
         )) : (
           <p style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>Nothing missed by sleep yet.</p>
         )}
+      </PhoneSection>
+    </AppShell>
+  );
+}
+
+function BeaconApp({ state, onBack, onLoadPack }) {
+  const [customJson, setCustomJson] = useState("");
+  const [customError, setCustomError] = useState("");
+  const activePackId = state.worldPackId || state.world?.id;
+  const activePack = state.world || normalizeWorldPack(WORLD_PACKS.core_campus);
+  const activeArcs = getWorldArcs(state);
+  const packButtonStyle = {
+    border: "1px solid rgba(240,235,220,0.12)",
+    borderRadius: 8,
+    padding: "8px 10px",
+    background: "rgba(200,161,101,0.12)",
+    color: "#f0ebdc",
+    fontSize: 11,
+    cursor: "pointer",
+  };
+
+  const loadCustomPack = () => {
+    try {
+      const parsed = JSON.parse(customJson);
+      const normalized = normalizeWorldPack(parsed);
+      if (!normalized.id || normalized.id === "custom_pack") {
+        normalized.id = `custom_${Date.now()}`;
+      }
+      setCustomError("");
+      onLoadPack(normalized);
+    } catch (error) {
+      setCustomError(error?.message || "Invalid JSON.");
+    }
+  };
+
+  return (
+    <AppShell title="Beacon" onBack={onBack} dark>
+      <PhoneSection title="Loaded Pack" dark>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "flex-start" }}>
+          <div>
+            <div style={{ color: "#f0ebdc", fontSize: 16, fontWeight: 800 }}>{activePack.label}</div>
+            <p style={{ margin: "5px 0 0", color: "rgba(240,235,220,0.70)", fontSize: 12, lineHeight: 1.45 }}>
+              {activePack.summary || "Authored world content is active."}
+            </p>
+          </div>
+          <div style={{ color: "#c8a165", fontSize: 11, whiteSpace: "nowrap" }}>
+            {Object.keys(activePack.locations || {}).length} loc · {Object.keys(activePack.npcs || {}).length} npc · {activeArcs.length} arc
+          </div>
+        </div>
+      </PhoneSection>
+
+      <PhoneSection title="Static Packs" dark>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+          {WORLD_PACK_LIST.map(pack => {
+            const normalized = normalizeWorldPack(pack);
+            const active = normalized.id === activePackId;
+            return (
+              <article key={normalized.id} style={{
+                border: `1px solid ${active ? "rgba(200,161,101,0.46)" : "rgba(240,235,220,0.10)"}`,
+                borderRadius: 8,
+                padding: 10,
+                background: active ? "rgba(200,161,101,0.16)" : "rgba(240,235,220,0.04)",
+                minHeight: 150,
+                display: "flex",
+                flexDirection: "column",
+                gap: 7,
+              }}>
+                <div style={{ color: "#f0ebdc", fontSize: 13, fontWeight: 800 }}>{normalized.label}</div>
+                <p style={{ margin: 0, color: "rgba(240,235,220,0.68)", fontSize: 11, lineHeight: 1.35, flex: 1 }}>
+                  {normalized.summary}
+                </p>
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                  <span style={{ color: "#c8a165", fontSize: 9 }}>{Object.keys(normalized.locations).length} locations</span>
+                  <span style={{ color: "#c8a165", fontSize: 9 }}>{Object.keys(normalized.npcs).length} NPCs</span>
+                  <span style={{ color: "#c8a165", fontSize: 9 }}>{normalized.arcs.length} arcs</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => onLoadPack(pack)}
+                  disabled={active}
+                  style={{
+                    ...packButtonStyle,
+                    opacity: active ? 0.55 : 1,
+                    cursor: active ? "default" : "pointer",
+                  }}
+                >
+                  {active ? "Loaded" : "Load"}
+                </button>
+              </article>
+            );
+          })}
+        </div>
+      </PhoneSection>
+
+      <PhoneSection title="Active Arcs" dark>
+        {activeArcs.length ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {activeArcs.map(arc => (
+              <article key={arc.id} style={{
+                border: "1px solid rgba(240,235,220,0.10)",
+                borderRadius: 8,
+                padding: 10,
+                background: "rgba(240,235,220,0.04)",
+              }}>
+                <div style={{ color: "#f0ebdc", fontSize: 12, fontWeight: 800 }}>{arc.title}</div>
+                <p style={{ margin: "4px 0 8px", color: "rgba(240,235,220,0.66)", fontSize: 11, lineHeight: 1.35 }}>{arc.summary}</p>
+                {asArray(arc.beats).slice(0, 3).map((beat, index) => (
+                  <div key={`${arc.id}-${index}`} style={{ color: "rgba(240,235,220,0.72)", fontSize: 10, lineHeight: 1.35, marginTop: 3 }}>
+                    {beat.label} · {getLocationLabel(state, beat.location)}
+                  </div>
+                ))}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>No active arcs in this pack.</p>
+        )}
+      </PhoneSection>
+
+      <PhoneSection title="JSON Import" dark>
+        <textarea
+          value={customJson}
+          onChange={event => setCustomJson(event.target.value)}
+          placeholder='{"id":"my_pack","label":"My Pack","locations":{},"npcs":{},"npcSchedules":{},"arcs":[]}'
+          style={{
+            width: "100%",
+            minHeight: 94,
+            boxSizing: "border-box",
+            resize: "vertical",
+            border: "1px solid rgba(240,235,220,0.14)",
+            borderRadius: 8,
+            padding: 10,
+            background: "rgba(0,0,0,0.16)",
+            color: "#f0ebdc",
+            fontFamily: "ui-monospace, SFMono-Regular, Consolas, monospace",
+            fontSize: 10,
+            outline: "none",
+          }}
+        />
+        {customError && <p style={{ margin: "6px 0 0", color: "#fecaca", fontSize: 11 }}>{customError}</p>}
+        <button
+          type="button"
+          onClick={loadCustomPack}
+          disabled={!customJson.trim()}
+          style={{
+            ...packButtonStyle,
+            width: "100%",
+            marginTop: 8,
+            opacity: customJson.trim() ? 1 : 0.5,
+            cursor: customJson.trim() ? "pointer" : "default",
+          }}
+        >
+          Load JSON pack
+        </button>
       </PhoneSection>
     </AppShell>
   );
@@ -4733,6 +5284,14 @@ export default function StudentBody() {
     });
   }, [showNotif]);
 
+  const handleLoadWorldPack = useCallback((pack) => {
+    setState(s => {
+      const update = applyWorldPack(s, pack);
+      if (update.notification) setTimeout(() => showNotif(update.notification), 200);
+      return normalizeState(update.state);
+    });
+  }, [showNotif]);
+
   if (!loaded || !state) {
     return (
       <div style={{
@@ -4765,6 +5324,7 @@ export default function StudentBody() {
     else if (appId === "anthrop") phoneContent = <AnthropApp state={state} onBack={backToHome} />;
     else if (appId === "margin")  phoneContent = <MarginApp  state={state} onBack={backToHome} onAddNote={handleAddNote} />;
     else if (appId === "wake")    phoneContent = <WakeApp    state={state} onBack={backToHome} onSetAlarm={handleSetAlarm} onSleep={handleSleep} />;
+    else if (appId === "beacon")  phoneContent = <BeaconApp  state={state} onBack={backToHome} onLoadPack={handleLoadWorldPack} />;
     else                          phoneContent = <StubApp    app={app}     onBack={backToHome} />;
   }
 
@@ -4803,7 +5363,7 @@ export default function StudentBody() {
             minHeight: 0,
             overflow: "hidden",
           }}>
-            <SceneImage locationKey={state.location} />
+            <SceneImage state={state} locationKey={state.location} />
 
             {/* World dim overlay when phone is open */}
             {phoneIsOpen && (
