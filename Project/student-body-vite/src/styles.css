@@ -336,8 +336,15 @@ button {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 14px;
   padding: 14px;
+  overflow: hidden;
   background: #1a1814;
   color: #f0ebdc;
+}
+
+.compass-app .phone-panel {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
 }
 
 .phone-panel {
@@ -364,9 +371,19 @@ button {
   gap: 8px;
 }
 
+.location-list {
+  min-height: 0;
+  align-content: start;
+  grid-auto-rows: minmax(38px, auto);
+  overflow: auto;
+  padding-right: 2px;
+}
+
 .location-button {
   width: 100%;
+  min-height: 38px;
   display: flex;
+  align-items: center;
   justify-content: space-between;
   gap: 10px;
   padding: 8px 10px;
@@ -378,6 +395,13 @@ button {
   font-family: system-ui, sans-serif;
   font-size: 12px;
   text-align: left;
+}
+
+.location-button span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .location-button.is-current {
@@ -458,6 +482,190 @@ button {
   text-align: center;
 }
 
+.subtle-copy {
+  margin: 0;
+  color: #7a6e58;
+  font-size: 12px;
+}
+
+.pulse-app,
+.margin-app {
+  height: 100%;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  overflow: auto;
+  font-family: system-ui, sans-serif;
+}
+
+.pulse-thread {
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border: 1px solid rgba(58, 53, 48, 0.1);
+  border-radius: 8px;
+  background: rgba(58, 53, 48, 0.05);
+}
+
+.pulse-thread h2,
+.pulse-thread p {
+  margin: 0;
+}
+
+.pulse-thread h2 {
+  font-size: 15px;
+}
+
+.pulse-thread header p {
+  color: #7a6e58;
+  font-size: 12px;
+}
+
+.message-list {
+  display: grid;
+  gap: 8px;
+}
+
+.message-bubble {
+  max-width: 92%;
+  display: grid;
+  gap: 4px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+
+.message-bubble--outgoing {
+  justify-self: end;
+  background: #3a3530;
+  color: #f0ebdc;
+}
+
+.message-bubble--incoming {
+  justify-self: start;
+  background: rgba(200, 161, 101, 0.22);
+  color: #302b24;
+}
+
+.message-bubble small {
+  opacity: 0.7;
+}
+
+.pulse-actions {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 6px;
+}
+
+.pulse-actions button,
+.margin-app button {
+  min-height: 34px;
+  border: 1px solid rgba(58, 53, 48, 0.16);
+  border-radius: 6px;
+  background: rgba(200, 161, 101, 0.16);
+  color: #302b24;
+  cursor: pointer;
+  font-family: system-ui, sans-serif;
+  font-size: 12px;
+}
+
+.pulse-actions button:hover,
+.margin-app button:hover {
+  background: rgba(200, 161, 101, 0.28);
+}
+
+.margin-app textarea {
+  width: 100%;
+  min-height: 92px;
+  resize: vertical;
+  padding: 10px;
+  border: 1px solid rgba(58, 53, 48, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.62);
+  color: #302b24;
+  font: 13px/1.4 system-ui, sans-serif;
+}
+
+.timeline-list {
+  display: grid;
+  gap: 8px;
+  max-height: 220px;
+  overflow: auto;
+}
+
+.timeline-item {
+  display: grid;
+  gap: 4px;
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(58, 53, 48, 0.08);
+}
+
+.timeline-item small {
+  color: #8b6f3d;
+  font: 700 10px/1 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.timeline-item p {
+  margin: 0;
+  color: #302b24;
+  font: 12px/1.35 system-ui, sans-serif;
+}
+
+.anthrop-app,
+.buzz-app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  padding: 14px;
+  overflow: auto;
+  background: #1a1814;
+  color: #f0ebdc;
+  font-family: system-ui, sans-serif;
+}
+
+.anthrop-card p,
+.anthrop-card li,
+.buzz-hero p,
+.buzz-card p {
+  color: #e2d7c0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.anthrop-card ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.relationship-grid,
+.buzz-grid {
+  display: grid;
+  gap: 8px;
+}
+
+.relationship-pill,
+.buzz-card {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(240, 235, 220, 0.1);
+  border-radius: 6px;
+  background: rgba(240, 235, 220, 0.05);
+}
+
+.buzz-card {
+  display: grid;
+}
+
+.relationship-pill strong,
+.buzz-card small {
+  color: #c8a165;
+}
+
 @media (max-width: 760px) {
   .game-shell {
     grid-template-rows: minmax(0, 68fr) minmax(210px, 32fr);
@@ -484,7 +692,8 @@ button {
     height: 78%;
   }
 
-  .compass-app {
+  .anthrop-app,
+  .buzz-app {
     grid-template-columns: 1fr;
   }
 }

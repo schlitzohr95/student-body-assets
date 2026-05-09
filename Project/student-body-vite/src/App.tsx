@@ -1,11 +1,15 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { APP_BY_ID } from "./data/apps";
 import { getScriptedScene } from "./engine/scriptedScenes";
-import { makeFreshState } from "./engine/state";
-import { applyChoice, navigateToLocation } from "./engine/transitions";
+import { makeFreshState, normalizeState } from "./engine/state";
+import { addMarginNote, applyChoice, navigateToLocation, sendPulseMessage } from "./engine/transitions";
 import { clearState, loadState, saveState } from "./services/storage";
 import type { Choice, GameState, LocationId } from "./types/game";
 import { CompassApp } from "./ui/apps/CompassApp";
+import { AnthropApp } from "./ui/apps/AnthropApp";
+import { BuzzApp } from "./ui/apps/BuzzApp";
+import { MarginApp } from "./ui/apps/MarginApp";
+import { PulseApp } from "./ui/apps/PulseApp";
 import { RosterApp } from "./ui/apps/RosterApp";
 import { SelfApp } from "./ui/apps/SelfApp";
 import { StubApp } from "./ui/apps/StubApp";
@@ -39,7 +43,7 @@ export default function App() {
     let live = true;
     loadState().then(saved => {
       if (!live) return;
-      setState(saved || makeFreshState());
+      setState(saved ? normalizeState(saved) : makeFreshState());
       setLoaded(true);
     });
     return () => {
@@ -105,6 +109,18 @@ export default function App() {
     if (update.notification) window.setTimeout(() => showNotification(update.notification!), 600);
   }, [showNotification, state]);
 
+  const handleSendMessage = useCallback((npcId: string, templateId: "check_in" | "ask_about_day" | "invite_coffee") => {
+    if (!state) return;
+    const update = sendPulseMessage(state, npcId, templateId);
+    setState(update.state);
+    if (update.notification) showNotification(update.notification);
+  }, [showNotification, state]);
+
+  const handleAddNote = useCallback((text: string) => {
+    if (!state) return;
+    setState(addMarginNote(state, text).state);
+  }, [state]);
+
   if (!loaded || !state) {
     return <main className="loading-screen">Loading...</main>;
   }
@@ -118,8 +134,12 @@ export default function App() {
     const appId = phone.view.slice(4);
     const app = APP_BY_ID[appId];
     if (appId === "compass") phoneContent = <CompassApp state={state} onNavigate={handleNavigate} />;
+    else if (appId === "pulse") phoneContent = <PulseApp state={state} onSendMessage={handleSendMessage} />;
     else if (appId === "roster") phoneContent = <RosterApp state={state} />;
     else if (appId === "self") phoneContent = <SelfApp state={state} />;
+    else if (appId === "buzz") phoneContent = <BuzzApp state={state} />;
+    else if (appId === "anthrop") phoneContent = <AnthropApp state={state} />;
+    else if (appId === "margin") phoneContent = <MarginApp state={state} onAddNote={handleAddNote} />;
     else if (app) phoneContent = <StubApp app={app} />;
   }
 
@@ -140,7 +160,9 @@ export default function App() {
           onDismiss={() => setNotification(null)}
           onTap={() => {
             setNotification(null);
-            openPhoneHome();
+            if (notification?.app === "Pulse") openApp("pulse");
+            else if (notification?.app === "Buzz") openApp("buzz");
+            else openPhoneHome();
           }}
         />
         {phoneIsOpen && (

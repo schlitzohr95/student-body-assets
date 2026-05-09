@@ -18,6 +18,28 @@ export function makeFreshState(): GameState {
     },
     npcsKnown: [],
     eventLog: [],
+    messages: [],
+    notes: [],
+  };
+}
+
+export function normalizeState(state: GameState): GameState {
+  const fresh = makeFreshState();
+  return {
+    ...fresh,
+    ...state,
+    player: {
+      ...fresh.player,
+      ...state.player,
+      stats: { ...fresh.player.stats, ...state.player?.stats },
+      resources: { ...fresh.player.resources, ...state.player?.resources },
+      traits: state.player?.traits || [],
+      relationships: state.player?.relationships || {},
+    },
+    npcsKnown: state.npcsKnown || [],
+    eventLog: state.eventLog || [],
+    messages: state.messages || [],
+    notes: state.notes || [],
   };
 }
 

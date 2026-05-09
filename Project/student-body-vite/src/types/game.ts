@@ -52,6 +52,23 @@ export interface GameEvent {
   npcWitnesses?: Array<string | { id?: string; key?: string; name?: string }>;
 }
 
+export interface GameMessage {
+  id: string;
+  day: number;
+  slot: number;
+  npcId: NpcId;
+  direction: "outgoing" | "incoming";
+  text: string;
+  read: boolean;
+}
+
+export interface GameNote {
+  id: string;
+  day: number;
+  slot: number;
+  text: string;
+}
+
 export interface NpcSchema {
   ageBand?: string;
   publicFace?: string;
@@ -107,6 +124,8 @@ export interface GameState {
   player: PlayerState;
   npcsKnown: string[];
   eventLog: GameEvent[];
+  messages: GameMessage[];
+  notes: GameNote[];
   npcDirectory?: Record<NpcId, Npc>;
   npcMoods?: Record<NpcId, string>;
   presentNpcIds?: NpcId[];
