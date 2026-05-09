@@ -254,7 +254,7 @@ function normalizeState(state) {
       stats: { ...fresh.player.stats, ...(player.stats || {}) },
       resources: { ...fresh.player.resources, ...(player.resources || {}) },
       traits: Array.isArray(player.traits) ? player.traits : [],
-      relationships: player.relationships || {},
+      relationships: normalizeRelationshipMap(player.relationships || {}),
     },
     npcsKnown: Array.isArray(state.npcsKnown) ? state.npcsKnown : [],
     messages: migrateTimedRecords(state.messages, legacyTimeScale),
@@ -596,30 +596,16 @@ function getRelationshipForNpc(state, npc) {
     state?.relationshipByNpc ||
     {};
   const record = relationships[npc.id] || relationships[npc.portraitKey] || relationships[npc.name];
-
-  if (record && typeof record === "object") {
-    return {
-      score: record.score ?? record.value ?? record.affinity ?? "unknown",
-      status: record.status || record.summary || record.label || "recorded",
-      traits: uniqueCompact(record.traits || record.flags || record.tags),
-      lastSeenDisposition: record.lastSeenDisposition || record.last_seen_disposition || record.disposition,
-    };
-  }
-
-  if (typeof record === "number" || typeof record === "string") {
-    return {
-      score: record,
-      status: "recorded",
-      traits: [],
-      lastSeenDisposition: npc.lastSeenDisposition,
-    };
-  }
-
+  const normalized = normalizeRelationshipRecord(record, npc);
+  const level = getRelationshipLevel(normalized.score);
   return {
-    score: 0,
-    status: "no relationship record yet",
-    traits: [],
-    lastSeenDisposition: npc.lastSeenDisposition || "No prior disposition recorded.",
+    ...normalized,
+    level: normalized.level || level.id,
+    levelLabel: level.label,
+    levelDescription: level.description,
+    traits: normalized.flags,
+    flags: normalized.flags,
+    recentMoments: normalized.recentMoments,
   };
 }
 
@@ -738,8 +724,10 @@ function buildNarratorContext(state, action) {
       npcId: npc.id,
       name: npc.name || npc.id,
       score: relationship.score,
+      level: relationship.levelLabel || relationship.level,
       status: relationship.status,
-      traits: relationship.traits,
+      flags: relationship.flags || relationship.traits,
+      recentMoments: relationship.recentMoments,
       lastSeenDisposition: relationship.lastSeenDisposition || npc.lastSeenDisposition || "No prior disposition recorded.",
     };
   });
@@ -758,8 +746,10 @@ function buildNarratorContext(state, action) {
       lastSeenDisposition: relationship.lastSeenDisposition || npc.lastSeenDisposition || "No prior disposition recorded.",
       relationshipToPlayer: {
         score: relationship.score,
+        level: relationship.levelLabel || relationship.level,
         status: relationship.status,
-        traits: relationship.traits,
+        flags: relationship.flags || relationship.traits,
+        recentMoments: relationship.recentMoments,
       },
     };
   });
@@ -918,22 +908,19 @@ function applyRelationshipChanges(state, changes) {
   const relationships = { ...(state.player?.relationships || state.relationships || {}) };
 
   for (const [npcId, change] of Object.entries(changes)) {
-    const current = relationships[npcId];
-    const record = current && typeof current === "object"
-      ? { ...current }
-      : { score: typeof current === "number" ? current : 0 };
+    const record = normalizeRelationshipRecord(relationships[npcId], { id: npcId });
 
     if (typeof change === "number") {
-      record.score = (typeof record.score === "number" ? record.score : 0) + change;
+      record.score += change;
     } else if (change && typeof change === "object") {
       Object.assign(record, change);
       if (typeof change.delta === "number") {
-        record.score = (typeof record.score === "number" ? record.score : 0) + change.delta;
+        record.score += change.delta;
         delete record.delta;
       }
     }
 
-    relationships[npcId] = record;
+    relationships[npcId] = normalizeRelationshipRecord(record, { id: npcId });
   }
 
   const next = { ...state };
@@ -1023,8 +1010,96 @@ const STAT_LABELS = {
   grit: "Grit",
 };
 
+const RELATIONSHIP_LEVELS = [
+  { id: "stranger", label: "Stranger", min: -999, max: 0, description: "They know of you, if that." },
+  { id: "met", label: "Met", min: 1, max: 2, description: "There is a name and a first impression." },
+  { id: "familiar", label: "Familiar", min: 3, max: 5, description: "Enough contact for small expectations to form." },
+  { id: "friendly", label: "Friendly", min: 6, max: 9, description: "Warmth is becoming part of the pattern." },
+  { id: "close", label: "Close", min: 10, max: 14, description: "They have reason to trust you with more than surface talk." },
+  { id: "bonded", label: "Bonded", min: 15, max: 999, description: "This relationship has real weight in the semester." },
+];
+
+const RELATIONSHIP_FLAG_LABELS = {
+  met: "Met",
+  trust: "Trust",
+  awkward: "Awkward",
+  texting: "Texting",
+  date_planned: "Date planned",
+};
+
 function clampValue(value, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
+}
+
+function relationshipScoreValue(record) {
+  if (typeof record === "number") return record;
+  if (typeof record === "string") {
+    const parsed = Number(record);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+  if (record && typeof record === "object") {
+    const value = Number(record.score ?? record.value ?? record.affinity ?? 0);
+    return Number.isFinite(value) ? value : 0;
+  }
+  return 0;
+}
+
+function getRelationshipLevel(score = 0) {
+  return RELATIONSHIP_LEVELS.find(level => score >= level.min && score <= level.max) || RELATIONSHIP_LEVELS[0];
+}
+
+function normalizeRelationshipMoment(moment) {
+  if (!moment) return null;
+  if (typeof moment === "string") return { text: moment };
+  if (typeof moment !== "object") return null;
+  const text = moment.text || moment.summary || moment.label;
+  if (!text) return null;
+  return {
+    day: moment.day,
+    slot: moment.slot,
+    text,
+    kind: moment.kind || "shared",
+  };
+}
+
+function normalizeRelationshipRecord(record, npc = {}) {
+  const base = record && typeof record === "object" ? record : {};
+  const score = relationshipScoreValue(record);
+  const level = getRelationshipLevel(score);
+  const flags = uniqueCompact([
+    ...asArray(base.flags || base.traits || base.tags),
+    ...(score >= 10 ? ["trust"] : []),
+  ]);
+  const moments = asArray(base.recentMoments || base.sharedMoments || base.moments)
+    .map(normalizeRelationshipMoment)
+    .filter(Boolean)
+    .slice(-8);
+
+  return {
+    ...base,
+    score,
+    level: level.id,
+    status: base.status || base.summary || base.label || (score > 0 ? "developing" : "no relationship record yet"),
+    flags,
+    recentMoments: moments,
+    lastSeenDisposition: base.lastSeenDisposition || base.last_seen_disposition || base.disposition || npc.lastSeenDisposition || "No prior disposition recorded.",
+  };
+}
+
+function normalizeRelationshipMap(relationships = {}) {
+  return Object.fromEntries(
+    Object.entries(relationships).map(([npcId, record]) => [npcId, normalizeRelationshipRecord(record, { id: npcId })])
+  );
+}
+
+function makeRelationshipMoment(state, text, kind = "shared") {
+  return { day: state.day, slot: state.timeSlot, text, kind };
+}
+
+function appendRelationshipMoment(record, moment) {
+  const normalized = normalizeRelationshipMoment(moment);
+  if (!normalized) return record.recentMoments || [];
+  return [...(record.recentMoments || []), normalized].slice(-8);
 }
 
 function changeStats(state, changes) {
@@ -1043,18 +1118,28 @@ function changeResources(state, changes) {
   return { ...state, player: { ...state.player, resources } };
 }
 
-function changeRelationship(state, npcId, delta, status) {
+function changeRelationship(state, npcId, delta, status, details = {}) {
   const relationships = { ...(state.player?.relationships || {}) };
-  const current = relationships[npcId];
-  const currentRecord = current && typeof current === "object" ? current : {};
-  const currentScore = typeof current === "number"
-    ? current
-    : (typeof currentRecord.score === "number" ? currentRecord.score : 0);
+  const currentRecord = normalizeRelationshipRecord(relationships[npcId], { id: npcId });
+  const nextScore = currentRecord.score + delta;
+  const addFlags = uniqueCompact(details.addFlags || details.flags);
+  const removeFlags = new Set(uniqueCompact(details.removeFlags).map(flag => String(flag).toLowerCase()));
+  const flags = uniqueCompact([
+    ...currentRecord.flags.filter(flag => !removeFlags.has(String(flag).toLowerCase())),
+    ...addFlags,
+    ...(nextScore >= 10 ? ["trust"] : []),
+  ]);
 
   relationships[npcId] = {
     ...currentRecord,
-    score: currentScore + delta,
+    score: nextScore,
+    level: getRelationshipLevel(nextScore).id,
     status: status || currentRecord.status || "developing",
+    flags,
+    recentMoments: details.moment
+      ? appendRelationshipMoment(currentRecord, details.moment)
+      : currentRecord.recentMoments,
+    lastSeenDisposition: details.lastSeenDisposition || currentRecord.lastSeenDisposition,
   };
 
   return { ...state, player: { ...state.player, relationships } };
@@ -1161,8 +1246,12 @@ function applyActivityOutcome(state, choice) {
       break;
     case "chat_counter":
       next = changeStats(next, { charm: 2, sensitivity: 1 });
-      next = changeRelationship(next, "studious", 1, "friendly");
       next = appendEvent(next, "Chatted with Mari at the coffee shop counter.", ["studious"]);
+      next = changeRelationship(next, "studious", 1, "friendly", {
+        removeFlags: ["awkward"],
+        moment: makeRelationshipMoment(next, "Chatted with Mari at the coffee shop counter."),
+        lastSeenDisposition: "Warmer at the counter; willing to linger a little.",
+      });
       break;
     case "leave":
       next = appendEvent(next, "Decided not to linger.");
@@ -1232,18 +1321,12 @@ function applyChoice(state, choice) {
       ...next,
       metMari: true,
       npcsKnown: next.npcsKnown.includes("studious") ? next.npcsKnown : [...next.npcsKnown, "studious"],
-      player: {
-        ...next.player,
-        relationships: {
-          ...(next.player.relationships || {}),
-          studious: {
-            score: 1,
-            status: "met",
-            lastSeenDisposition: "Professionally warm and curious.",
-          },
-        },
-      },
     };
+    next = changeRelationship(next, "studious", 1, choice.tag === "met_mari_quiet" ? "met, reserved" : "met", {
+      addFlags: choice.tag === "met_mari_quiet" ? ["met", "awkward"] : ["met", "texting"],
+      moment: makeRelationshipMoment(next, "Met Mari at the coffee shop."),
+      lastSeenDisposition: choice.tag === "met_mari_quiet" ? "Professionally polite; not unfriendly, but not drawn in yet." : "Professionally warm and curious.",
+    });
     notification = { app: "Pulse", body: "Mari saved your number." };
   }
 
@@ -1294,7 +1377,11 @@ function sendPulseMessage(state, npcId, templateId) {
     `Texted ${npc?.name || npcId}: ${text}`,
     [npcId],
   );
-  next = changeRelationship(next, npcId, templateId === "invite_coffee" ? 2 : 1, "texting");
+  next = changeRelationship(next, npcId, templateId === "invite_coffee" ? 2 : 1, "texting", {
+    addFlags: templateId === "invite_coffee" ? ["texting", "date_planned"] : ["texting"],
+    moment: makeRelationshipMoment(next, `Texted ${npc?.name || npcId}: ${text}`, "message"),
+    lastSeenDisposition: templateId === "invite_coffee" ? "Open to making plans by text." : "Responsive by text.",
+  });
 
   return {
     state: next,
@@ -2047,8 +2134,65 @@ function CompassApp({ state, onBack, onNavigate }) {
   );
 }
 
+function RelationshipScoreBar({ score }) {
+  const normalized = clampValue((Number(score) || 0) / 15, 0, 1);
+  return (
+    <div style={{
+      height: 6,
+      borderRadius: 999,
+      background: "rgba(58,53,48,0.10)",
+      overflow: "hidden",
+      marginTop: 6,
+    }}>
+      <div style={{
+        width: `${normalized * 100}%`,
+        height: "100%",
+        borderRadius: 999,
+        background: "#c8a165",
+      }} />
+    </div>
+  );
+}
+
+function RelationshipFlagChips({ flags }) {
+  const safeFlags = uniqueCompact(flags);
+  if (!safeFlags.length) {
+    return <span style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No flags yet.</span>;
+  }
+  return (
+    <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+      {safeFlags.map(flag => (
+        <span key={flag} style={{
+          padding: "4px 7px",
+          borderRadius: 999,
+          background: flag === "awkward" ? "rgba(180,83,9,0.12)" : "rgba(200,161,101,0.14)",
+          border: `1px solid ${flag === "awkward" ? "rgba(180,83,9,0.18)" : "rgba(58,53,48,0.10)"}`,
+          color: flag === "awkward" ? "#92400e" : "#3a3530",
+          fontSize: 10,
+        }}>
+          {RELATIONSHIP_FLAG_LABELS[flag] || flag}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 function RosterApp({ state, onBack }) {
   const known = (state.npcsKnown || []).map(key => getKnownNpc(state, key)).filter(Boolean);
+  const [selectedId, setSelectedId] = useState(known[0]?.id || null);
+  const selected = known.find(npc => npc.id === selectedId) || known[0];
+  const relationship = selected ? getRelationshipForNpc(state, selected) : null;
+  const relationshipLevel = relationship ? getRelationshipLevel(relationship.score) : null;
+  const fallbackMoments = selected
+    ? (state.eventLog || []).filter(event => eventMatchesPresentWitness(event, [selected])).slice(-4).map(event => ({
+      day: event.day,
+      slot: event.slot,
+      text: eventSummary(event),
+    }))
+    : [];
+  const moments = relationship?.recentMoments?.length ? relationship.recentMoments.slice().reverse() : fallbackMoments.reverse();
+  const schema = selected?.schema || {};
+
   return (
     <AppShell title="Roster" onBack={onBack}>
       {known.length === 0 ? (
@@ -2059,35 +2203,119 @@ function RosterApp({ state, onBack }) {
           You haven't met anyone worth saving yet.
         </div>
       ) : (
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {known.map(npc => {
-            const relationship = state.player.relationships?.[npc.id] || {};
-            return (
-            <div key={npc.id} style={{
-              display: "flex", alignItems: "center", gap: 12,
-              padding: "10px 12px",
-              background: "rgba(58,53,48,0.04)",
-              border: "1px solid rgba(58,53,48,0.08)",
-              borderRadius: 8,
-            }}>
+        <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {known.map(npc => {
+              const npcRelationship = getRelationshipForNpc(state, npc);
+              const npcLevel = getRelationshipLevel(npcRelationship.score);
+              const active = selected?.id === npc.id;
+              return (
+                <button
+                  type="button"
+                  key={npc.id}
+                  onClick={() => setSelectedId(npc.id)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    textAlign: "left",
+                    padding: "8px 10px",
+                    background: active ? "rgba(200,161,101,0.18)" : "rgba(58,53,48,0.04)",
+                    border: `1px solid ${active ? "rgba(200,161,101,0.32)" : "rgba(58,53,48,0.08)"}`,
+                    borderRadius: 8,
+                    cursor: "pointer",
+                    color: "#3a3530",
+                  }}
+                >
+                  <div style={{
+                    width: 36, height: 36, borderRadius: "50%",
+                    overflow: "hidden", flexShrink: 0,
+                    border: "1px solid rgba(58,53,48,0.18)",
+                  }}>
+                    {PORTRAIT_SVGS[npc.portraitKey || npc.id] ? <InlineSvg svg={PORTRAIT_SVGS[npc.portraitKey || npc.id]} /> : null}
+                  </div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 12, fontWeight: 700 }}>{npc.name || npc.id}</div>
+                    <div style={{ fontSize: 10, color: "#7a6e58" }}>{npcLevel.label} · {npcRelationship.status}</div>
+                  </div>
+                  <div style={{ fontSize: 11, color: "#8b6f3d", fontWeight: 700 }}>{npcRelationship.score}</div>
+                </button>
+              );
+            })}
+          </div>
+
+          {selected && relationship && (
+            <>
+              <PhoneSection title="Contact">
+                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{
-                width: 44, height: 44, borderRadius: "50%",
+                    width: 56, height: 56, borderRadius: "50%",
                 overflow: "hidden", flexShrink: 0,
                 border: "1px solid rgba(58,53,48,0.18)",
               }}>
-                {PORTRAIT_SVGS[npc.portraitKey || npc.id] ? <InlineSvg svg={PORTRAIT_SVGS[npc.portraitKey || npc.id]} /> : null}
+                    {PORTRAIT_SVGS[selected.portraitKey || selected.id] ? <InlineSvg svg={PORTRAIT_SVGS[selected.portraitKey || selected.id]} /> : null}
               </div>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontSize: 13, fontWeight: 600 }}>{npc.name || npc.id}</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 16, fontWeight: 800 }}>{selected.name || selected.id}</div>
                 <div style={{ fontSize: 11, color: "#7a6e58" }}>
-                  {npc.role || "Contact"}
+                      {selected.role || "Contact"}
                 </div>
-                <div style={{ fontSize: 10, color: "#8b6f3d", marginTop: 3 }}>
-                  {relationship.status || "known"} {typeof relationship.score === "number" ? `+${relationship.score}` : ""}
+                    <div style={{ fontSize: 11, color: "#8b6f3d", marginTop: 5, fontWeight: 700 }}>
+                      {relationshipLevel.label} · {relationship.score}
+                    </div>
+                    <RelationshipScoreBar score={relationship.score} />
+                  </div>
                 </div>
-              </div>
-            </div>
-          );})}
+                <p style={{ margin: "10px 0 0", color: "#3a3530", fontSize: 12, lineHeight: 1.45 }}>
+                  {relationshipLevel.description}
+                </p>
+              </PhoneSection>
+
+              <PhoneSection title="Flags">
+                <RelationshipFlagChips flags={relationship.flags} />
+              </PhoneSection>
+
+              <PhoneSection title="Standing">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 8 }}>
+                  <div>
+                    <div style={{ color: "#8b6f3d", fontSize: 10, textTransform: "uppercase", letterSpacing: 1 }}>Status</div>
+                    <p style={{ margin: "3px 0 0", color: "#3a3530", fontSize: 12 }}>{relationship.status}</p>
+                  </div>
+                  <div>
+                    <div style={{ color: "#8b6f3d", fontSize: 10, textTransform: "uppercase", letterSpacing: 1 }}>Last seen</div>
+                    <p style={{ margin: "3px 0 0", color: "#3a3530", fontSize: 12, lineHeight: 1.4 }}>{relationship.lastSeenDisposition}</p>
+                  </div>
+                </div>
+              </PhoneSection>
+
+              <PhoneSection title="Recent Shared Moments">
+                {moments.length ? moments.map((moment, index) => (
+                  <TimelineItem when={moment.day ? formatMoment(moment.day, moment.slot || 0) : "Earlier"} key={`${moment.text}-${index}`}>
+                    {moment.text}
+                  </TimelineItem>
+                )) : (
+                  <p style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No shared moments recorded yet.</p>
+                )}
+              </PhoneSection>
+
+              <PhoneSection title="What You Know">
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+                  <div>
+                    <div style={{ color: "#8b6f3d", fontSize: 10, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Lands</div>
+                    <p style={{ margin: 0, color: "#3a3530", fontSize: 11, lineHeight: 1.4 }}>
+                      {asArray(schema.whatLands).join(", ") || "Nothing specific yet."}
+                    </p>
+                  </div>
+                  <div>
+                    <div style={{ color: "#8b6f3d", fontSize: 10, textTransform: "uppercase", letterSpacing: 1, marginBottom: 4 }}>Falls flat</div>
+                    <p style={{ margin: 0, color: "#3a3530", fontSize: 11, lineHeight: 1.4 }}>
+                      {asArray(schema.whatFallsFlat).join(", ") || "Nothing specific yet."}
+                    </p>
+                  </div>
+                </div>
+              </PhoneSection>
+            </>
+          )}
         </div>
       )}
     </AppShell>
@@ -2383,7 +2611,8 @@ function AnthropApp({ state, onBack }) {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 8 }}>
             {relationshipEntries.map(([npcId, record]) => {
               const npc = getKnownNpc(state, npcId);
-              const score = typeof record === "object" ? record.score : record;
+              const relationship = normalizeRelationshipRecord(record, npc);
+              const level = getRelationshipLevel(relationship.score);
               return (
                 <div key={npcId} style={{
                   border: "1px solid rgba(240,235,220,0.10)",
@@ -2395,8 +2624,8 @@ function AnthropApp({ state, onBack }) {
                   color: "#f0ebdc",
                   fontSize: 12,
                 }}>
-                  <span>{npc.name || npcId}</span>
-                  <strong>{score ?? 0}</strong>
+                  <span>{npc.name || npcId} · {level.label}</span>
+                  <strong>{relationship.score ?? 0}</strong>
                 </div>
               );
             })}
