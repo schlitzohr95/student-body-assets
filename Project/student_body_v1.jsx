@@ -203,7 +203,7 @@ const APPS = [
   { id: "spark",   label: "Spark",   role: "Dating",      layout: "landscape", impl: false },
   { id: "margin",  label: "Margin",  role: "Notes",       layout: "portrait",  impl: true  },
   { id: "lens",    label: "Lens",    role: "Camera",      layout: "landscape", impl: false },
-  { id: "wake",    label: "Wake",    role: "Alarm",       layout: "portrait",  impl: false },
+  { id: "wake",    label: "Wake",    role: "Alarm",       layout: "portrait",  impl: true  },
   { id: "beacon",  label: "Beacon",  role: "Browser",     layout: "landscape", impl: false },
 ];
 
@@ -232,9 +232,15 @@ function makeFreshState() {
     },
     npcsKnown: [], // list of portrait keys the player has met
     messages: [],
+    pendingMessages: [],
     notes: [],
+    buzzPosts: [],
+    bulletinBoards: {},
+    commitments: [],
+    missedBlocks: [],
     eventLog: [],
     activityHistory: { activities: {} },
+    wake: { alarmSlot: timeChunk(7, 30), lastSleep: null },
   };
 }
 
@@ -261,9 +267,19 @@ function normalizeState(state) {
     },
     npcsKnown: Array.isArray(state.npcsKnown) ? state.npcsKnown : [],
     messages: migrateTimedRecords(state.messages, legacyTimeScale),
+    pendingMessages: migratePendingMessages(state.pendingMessages, legacyTimeScale),
     notes: migrateTimedRecords(state.notes, legacyTimeScale),
+    buzzPosts: migrateTimedRecords(state.buzzPosts, legacyTimeScale),
+    bulletinBoards: state.bulletinBoards && typeof state.bulletinBoards === "object" ? state.bulletinBoards : {},
+    commitments: migrateTimedRecords(state.commitments, legacyTimeScale),
+    missedBlocks: migrateTimedRecords(state.missedBlocks, legacyTimeScale),
     eventLog: migrateTimedRecords(state.eventLog, legacyTimeScale),
     activityHistory: normalizeActivityHistory(state.activityHistory),
+    wake: {
+      ...fresh.wake,
+      ...(state.wake || {}),
+      alarmSlot: normalizeTimeSlot(state.wake?.alarmSlot ?? fresh.wake.alarmSlot, legacyTimeScale),
+    },
   };
 }
 
@@ -327,6 +343,32 @@ function migrateTimedRecords(records, legacyScale) {
     if (!record || typeof record !== "object" || typeof record.slot !== "number") return record;
     return { ...record, slot: normalizeTimeSlot(record.slot, legacyScale) };
   });
+}
+
+function migratePendingMessages(records, legacyScale) {
+  if (!Array.isArray(records)) return [];
+  return records.map(record => {
+    if (!record || typeof record !== "object") return record;
+    return {
+      ...record,
+      slot: typeof record.slot === "number" ? normalizeTimeSlot(record.slot, legacyScale) : record.slot,
+      dueSlot: normalizeTimeSlot(record.dueSlot ?? record.slot ?? timeChunk(8), legacyScale),
+    };
+  });
+}
+
+function absoluteMoment(day = 1, slot = 0) {
+  const safeDay = Math.max(1, Math.floor(Number(day) || 1));
+  return ((safeDay - 1) * CHUNKS_PER_DAY) + normalizeTimeSlot(slot);
+}
+
+function addChunksToMoment(day = 1, slot = 0, chunks = 0) {
+  const absolute = absoluteMoment(day, slot) + Math.round(Number(chunks) || 0);
+  const bounded = Math.max(0, absolute);
+  return {
+    day: Math.floor(bounded / CHUNKS_PER_DAY) + 1,
+    slot: bounded % CHUNKS_PER_DAY,
+  };
 }
 
 function formatClockTime(slot = 0) {
@@ -997,6 +1039,24 @@ const MESSAGE_TEMPLATES = {
   invite_coffee: "Want to grab coffee sometime this week?",
 };
 
+const PULSE_REPLY_TEMPLATES = {
+  studious: {
+    check_in: "Still alive. Extremely caffeinated. You surviving first-week gravity?",
+    ask_about_day: "Busy, but not tragic. The morning crowd was a lot. How's campus treating you?",
+    invite_coffee: "Maybe. If you mean an actual coffee and not hovering at my counter while I work.",
+  },
+  roommate: {
+    check_in: "Alive. Room still standing. I count that as a win.",
+    ask_about_day: "Class, food, pretending to know where buildings are. Standard heroic journey.",
+    invite_coffee: "Yeah, sure. Text me when you're heading that way.",
+  },
+  default: {
+    check_in: "Still here. What's up?",
+    ask_about_day: "A lot, honestly. How's yours?",
+    invite_coffee: "Maybe. Send me a time and we'll see.",
+  },
+};
+
 const BUZZ_FEED_ITEMS = [
   "Open mic sign-ups are live at the Student Union desk.",
   "Intramural teams are still short two runners.",
@@ -1004,6 +1064,63 @@ const BUZZ_FEED_ITEMS = [
   "Someone posted a lost keyring notice near the dining hall.",
   "The bookstore is discounting used lab notebooks this week.",
   "A philosophy club flyer asks if a sandwich can be lonely.",
+];
+
+const LOCATION_HOURS = {
+  dorm_room: { alwaysOpen: true },
+  dorm_hallway: { alwaysOpen: true },
+  walking_path: { alwaysOpen: true },
+  quad: { open: timeChunk(6), close: timeChunk(22) },
+  quad_night: { open: timeChunk(20), close: timeChunk(24) },
+  library_main: { open: timeChunk(7), close: timeChunk(23) },
+  library_stacks: { open: timeChunk(8), close: timeChunk(22) },
+  lecture_hall: { open: timeChunk(7), close: timeChunk(18) },
+  dining_hall: { open: timeChunk(7), close: timeChunk(21) },
+  gym: { open: timeChunk(6), close: timeChunk(22) },
+  student_union: { open: timeChunk(7), close: timeChunk(23) },
+  coffee_shop: { open: timeChunk(7), close: timeChunk(20) },
+  bar: { open: timeChunk(18), close: timeChunk(2) },
+  bookstore: { open: timeChunk(9), close: timeChunk(19) },
+  restaurant: { open: timeChunk(11), close: timeChunk(22) },
+  townie_apartment: { open: timeChunk(9), close: timeChunk(23) },
+  running_trail: { open: timeChunk(5), close: timeChunk(21) },
+  park: { open: timeChunk(6), close: timeChunk(22) },
+};
+
+const BULLETIN_TEMPLATES = [
+  { id: "open_mic", title: "Open mic sign-ups", body: "Student Union lounge, three-song limit, no experience required.", location: "student_union", dayOffset: 0, slot: timeChunk(19), kind: "social" },
+  { id: "pickup_ball", title: "Pickup basketball", body: "Half-court games at the gym. Bring water and a flexible ego.", location: "gym", dayOffset: 1, slot: timeChunk(16), kind: "fitness" },
+  { id: "research_workshop", title: "Research workshop", body: "Librarians are showing first-years how not to drown in databases.", location: "library_main", dayOffset: 2, slot: timeChunk(15, 30), kind: "study" },
+  { id: "poetry_wall", title: "Poetry wall", body: "Anonymous lines going up outside the upper stacks all week.", location: "library_stacks", dayOffset: 1, slot: timeChunk(18), kind: "creative" },
+  { id: "coffee_tasting", title: "Coffee tasting night", body: "A cheap way to learn why people argue about beans.", location: "coffee_shop", dayOffset: 3, slot: timeChunk(18, 30), kind: "social" },
+  { id: "trail_cleanup", title: "Trail cleanup", body: "Morning volunteer crew on the creekside path.", location: "running_trail", dayOffset: 5, slot: timeChunk(9), kind: "campus" },
+];
+
+const BUZZ_POST_TEMPLATES = {
+  scheduled: [
+    "Heads up: {title} starts at {time} near {place}.",
+    "{place} is getting traffic for {title} around {time}.",
+  ],
+  npc: [
+    "{name} was spotted around {place}. Usual rhythm, slightly different expression.",
+    "Campus orbit note: {name} seems to be spending time at {place}.",
+  ],
+  event: [
+    "Someone's day just logged this: {event}",
+    "Small campus ripple: {event}",
+  ],
+  bulletin: [
+    "Flyer board says: {title}.",
+    "New low-stakes plan material: {title} at {place}.",
+  ],
+};
+
+const WAKE_ALARMS = [
+  timeChunk(6, 30),
+  timeChunk(7, 30),
+  timeChunk(8, 30),
+  timeChunk(9, 30),
+  timeChunk(10, 30),
 ];
 
 const STAT_LABELS = {
@@ -1714,9 +1831,46 @@ function describeTravelPlan(plan) {
   return parts.join(" / ");
 }
 
+function getLocationHours(locationKey) {
+  return LOCATION_HOURS[locationKey] || { open: timeChunk(7), close: timeChunk(22) };
+}
+
+function isSlotWithinHours(slot, hours) {
+  if (!hours || hours.alwaysOpen) return true;
+  const current = normalizeTimeSlot(slot);
+  const open = normalizeTimeSlot(hours.open ?? 0);
+  const closeRaw = hours.close ?? CHUNKS_PER_DAY;
+  const close = closeRaw >= CHUNKS_PER_DAY ? CHUNKS_PER_DAY : normalizeTimeSlot(closeRaw);
+  if (open === close) return true;
+  if (open < close) return current >= open && current < close;
+  return current >= open || current < close;
+}
+
+function isLocationOpenAt(state, locationKey, slot = state.timeSlot) {
+  return isSlotWithinHours(slot, getLocationHours(locationKey));
+}
+
+function formatLocationHours(locationKey) {
+  const hours = getLocationHours(locationKey);
+  if (hours.alwaysOpen) return "always open";
+  return `${formatClockTime(hours.open)}-${formatClockTime(hours.close)}`;
+}
+
+function describeLocationOpenState(state, locationKey) {
+  const open = isLocationOpenAt(state, locationKey);
+  return open ? "open" : "closed";
+}
+
 function navigateToLocation(state, locationKey, transitMode = "walk") {
   if (state.location === locationKey) return { state };
   const destination = LOCATIONS[locationKey]?.label || locationKey;
+  if (!isLocationOpenAt(state, locationKey)) {
+    const hours = formatLocationHours(locationKey);
+    return {
+      state: appendEvent(state, `Could not travel to ${destination}: closed (${hours}).`),
+      notification: { app: "Compass", body: `${destination} is closed right now (${hours}).` },
+    };
+  }
   const plan = getTravelPlan(state, locationKey, transitMode);
   const failure = canAffordTravel(state, plan);
   if (failure) {
@@ -1772,6 +1926,8 @@ function sendPulseMessage(state, npcId, templateId) {
   const npc = getKnownNpc(state, npcId);
   const text = MESSAGE_TEMPLATES[templateId] || MESSAGE_TEMPLATES.check_in;
   const idSeed = `${state.day}-${state.timeSlot}-${npcId}-${templateId}-${Date.now()}`;
+  const replyDelay = getPulseReplyDelay(state, npcId, templateId);
+  const due = addChunksToMoment(state.day, state.timeSlot, replyDelay);
   const outgoing = {
     id: `${idSeed}-out`,
     day: state.day,
@@ -1781,22 +1937,23 @@ function sendPulseMessage(state, npcId, templateId) {
     text,
     read: true,
   };
-  const incoming = {
+  const pending = {
     id: `${idSeed}-in`,
     day: state.day,
     slot: state.timeSlot,
+    dueDay: due.day,
+    dueSlot: due.slot,
     npcId,
     direction: "incoming",
-    text: npc?.name === "Mari"
-      ? "Not bad. Busy, but that's normal. You settling in okay?"
-      : "Yeah, I'm around. What's up?",
+    text: getScriptedPulseReply(npc, templateId),
     read: false,
   };
 
   let next = appendEvent(
     {
       ...state,
-      messages: [...(state.messages || []), outgoing, incoming],
+      messages: [...(state.messages || []), outgoing],
+      pendingMessages: [...(state.pendingMessages || []), pending],
     },
     `Texted ${npc?.name || npcId}: ${text}`,
     [npcId],
@@ -1809,18 +1966,413 @@ function sendPulseMessage(state, npcId, templateId) {
 
   return {
     state: next,
-    notification: { app: "Pulse", body: `${npc?.name || npcId} replied.` },
+    notification: { app: "Pulse", body: `Message sent. Reply expected around ${formatClockTime(due.slot)}.` },
   };
 }
 
-function addMarginNote(state, text) {
+function getScriptedPulseReply(npc, templateId) {
+  const npcId = npc?.id || "default";
+  const templates = PULSE_REPLY_TEMPLATES[npcId] || PULSE_REPLY_TEMPLATES.default;
+  return templates[templateId] || templates.check_in || PULSE_REPLY_TEMPLATES.default.check_in;
+}
+
+function getPulseReplyDelay(state, npcId, templateId) {
+  const seed = `${state.day}-${state.timeSlot}-${npcId}-${templateId}`
+    .split("")
+    .reduce((sum, char) => sum + char.charCodeAt(0), 0);
+  return 2 + (seed % 7); // 30-120 minutes in quarter-hour chunks.
+}
+
+function processPendingMessages(state) {
+  const pending = state.pendingMessages || [];
+  if (!pending.length) return { state };
+  const now = absoluteMoment(state.day, state.timeSlot);
+  const due = pending.filter(message => absoluteMoment(message.dueDay, message.dueSlot) <= now);
+  if (!due.length) return { state };
+
+  const delivered = due.map(message => ({
+    ...message,
+    day: state.day,
+    slot: state.timeSlot,
+    dueDay: undefined,
+    dueSlot: undefined,
+  }));
+  let next = {
+    ...state,
+    pendingMessages: pending.filter(message => absoluteMoment(message.dueDay, message.dueSlot) > now),
+    messages: [...(state.messages || []), ...delivered],
+  };
+
+  for (const message of due) {
+    const npc = getKnownNpc(next, message.npcId);
+    next = appendEvent(next, `${npc?.name || message.npcId} replied in Pulse.`, [message.npcId]);
+    next = changeRelationship(next, message.npcId, 0, "texting", {
+      addFlags: ["texting"],
+      moment: makeRelationshipMoment(next, `${npc?.name || message.npcId} replied: ${message.text}`, "message"),
+      lastSeenDisposition: "Responsive by text.",
+    });
+  }
+
+  const firstNpc = getKnownNpc(next, due[0].npcId);
+  return {
+    state: next,
+    notification: {
+      app: "Pulse",
+      body: due.length === 1 ? `${firstNpc?.name || due[0].npcId} replied.` : `${due.length} new replies.`,
+    },
+  };
+}
+
+function markPulseThreadRead(state, npcId) {
+  return {
+    ...state,
+    messages: (state.messages || []).map(message => (
+      message.npcId === npcId && message.direction === "incoming"
+        ? { ...message, read: true }
+        : message
+    )),
+  };
+}
+
+function getUnreadCount(state, npcId = null) {
+  return (state.messages || []).filter(message => (
+    message.direction === "incoming" &&
+    !message.read &&
+    (!npcId || message.npcId === npcId)
+  )).length;
+}
+
+function bulletinBoardKey(state) {
+  const moment = getCalendarMoment(state);
+  return `w${moment.week}-d${moment.dayIndex}`;
+}
+
+function generateBulletinItems(state) {
+  const key = bulletinBoardKey(state);
+  const moment = getCalendarMoment(state);
+  const startIndex = (moment.week + moment.dayIndex) % BULLETIN_TEMPLATES.length;
+  return [0, 1, 2].map(index => {
+    const template = BULLETIN_TEMPLATES[(startIndex + index) % BULLETIN_TEMPLATES.length];
+    const target = addChunksToMoment(state.day + (template.dayOffset || 0), template.slot || timeChunk(18), 0);
+    return {
+      ...template,
+      id: `${key}-${template.id}`,
+      boardKey: key,
+      day: target.day,
+      slot: target.slot,
+    };
+  });
+}
+
+function getBulletinItems(state) {
+  const key = bulletinBoardKey(state);
+  const cached = state.bulletinBoards?.[key];
+  return Array.isArray(cached) && cached.length ? cached : generateBulletinItems(state);
+}
+
+function ensureBulletinBoard(state) {
+  const key = bulletinBoardKey(state);
+  if (Array.isArray(state.bulletinBoards?.[key]) && state.bulletinBoards[key].length) return state;
+  return {
+    ...state,
+    bulletinBoards: {
+      ...(state.bulletinBoards || {}),
+      [key]: generateBulletinItems(state),
+    },
+  };
+}
+
+function commitToBulletin(state, flyerId) {
+  const withBoard = ensureBulletinBoard(state);
+  const flyer = getBulletinItems(withBoard).find(item => item.id === flyerId);
+  if (!flyer) return { state: withBoard };
+  const already = (withBoard.commitments || []).some(commitment => commitment.sourceId === flyer.id);
+  if (already) {
+    return {
+      state: withBoard,
+      notification: { app: "Anthrop", body: `${flyer.title} is already on your radar.` },
+    };
+  }
+
+  const commitment = {
+    id: `commit-${flyer.id}`,
+    sourceId: flyer.id,
+    source: "bulletin",
+    title: flyer.title,
+    body: flyer.body,
+    kind: flyer.kind,
+    location: flyer.location,
+    day: flyer.day,
+    slot: flyer.slot,
+    done: false,
+  };
+  let next = {
+    ...withBoard,
+    commitments: [...(withBoard.commitments || []), commitment],
+  };
+  next = appendEvent(next, `Committed to check out ${flyer.title}.`);
+  return {
+    state: next,
+    notification: { app: "Anthrop", body: `${flyer.title} added as an active lead.` },
+  };
+}
+
+function fillBuzzTemplate(template, data) {
+  return String(template || "").replace(/\{(\w+)\}/g, (_, key) => data[key] ?? "");
+}
+
+function makeBuzzPost(state, source, text, details = {}) {
+  return {
+    id: `${source}-${details.id || state.day}-${state.timeSlot}-${details.index || 0}`,
+    day: details.day ?? state.day,
+    slot: details.slot ?? state.timeSlot,
+    dayKey: details.dayKey || `d${details.day ?? state.day}`,
+    author: details.author || "Campus Buzz",
+    source,
+    text,
+    location: details.location || state.location,
+    relatedId: details.relatedId,
+  };
+}
+
+function generateDailyBuzzPosts(state) {
+  const moment = getCalendarMoment(state);
+  const dayKey = `w${moment.week}-d${moment.dayIndex}`;
+  const posts = [];
+  const scheduled = getTodayCalendarItems(state).filter(item => (item.end ?? item.slot + 1) >= state.timeSlot).slice(0, 2);
+  scheduled.forEach((item, index) => {
+    const template = BUZZ_POST_TEMPLATES.scheduled[index % BUZZ_POST_TEMPLATES.scheduled.length];
+    posts.push(makeBuzzPost(state, "scheduled", fillBuzzTemplate(template, {
+      title: item.title,
+      time: formatClockTime(item.slot),
+      place: LOCATIONS[item.location]?.label || item.location,
+    }), { id: item.id, index, dayKey, day: item.day || state.day, slot: item.slot, location: item.location, relatedId: item.id }));
+  });
+
+  getBulletinItems(state).slice(0, 2).forEach((flyer, index) => {
+    const template = BUZZ_POST_TEMPLATES.bulletin[index % BUZZ_POST_TEMPLATES.bulletin.length];
+    posts.push(makeBuzzPost(state, "bulletin", fillBuzzTemplate(template, {
+      title: flyer.title,
+      place: LOCATIONS[flyer.location]?.label || flyer.location,
+    }), { id: flyer.id, index: index + 10, dayKey, day: state.day, slot: state.timeSlot, location: flyer.location, relatedId: flyer.id }));
+  });
+
+  getNpcPresenceAtLocation(state, state.location, getNpcDirectory(state)).slice(0, 1).forEach((npc, index) => {
+    const template = BUZZ_POST_TEMPLATES.npc[index % BUZZ_POST_TEMPLATES.npc.length];
+    posts.push(makeBuzzPost(state, "npc", fillBuzzTemplate(template, {
+      name: npc.name || npc.id,
+      place: LOCATIONS[state.location]?.label || state.location,
+    }), { id: npc.id, index: index + 20, dayKey, location: state.location, relatedId: npc.id, author: "Seen Around" }));
+  });
+
+  const recentEvent = (state.eventLog || []).slice(-1)[0];
+  if (recentEvent) {
+    const template = BUZZ_POST_TEMPLATES.event[0];
+    posts.push(makeBuzzPost(state, "event", fillBuzzTemplate(template, {
+      event: eventSummary(recentEvent),
+    }), { id: `event-${recentEvent.day}-${recentEvent.slot}`, index: 30, dayKey, day: recentEvent.day, slot: recentEvent.slot, location: state.location }));
+  }
+
+  return posts.slice(0, 5);
+}
+
+function processDailyBuzz(state) {
+  const moment = getCalendarMoment(state);
+  const dayKey = `w${moment.week}-d${moment.dayIndex}`;
+  if ((state.buzzPosts || []).some(post => post.dayKey === dayKey)) return { state };
+  const generated = generateDailyBuzzPosts(state).map(post => ({ ...post, dayKey }));
+  return {
+    state: {
+      ...state,
+      buzzPosts: [...(state.buzzPosts || []), ...generated].slice(-80),
+    },
+  };
+}
+
+function getBuzzFeed(state) {
+  const stored = state.buzzPosts || [];
+  const fallback = stored.length ? [] : generateDailyBuzzPosts(state);
+  return [...stored, ...fallback]
+    .sort((a, b) => absoluteMoment(b.day, b.slot) - absoluteMoment(a.day, a.slot))
+    .slice(0, 8);
+}
+
+function getUpcomingCommitments(state, limit = 6) {
+  const now = absoluteMoment(state.day, state.timeSlot);
+  return (state.commitments || [])
+    .filter(commitment => !commitment.done && absoluteMoment(commitment.day, commitment.slot) >= now)
+    .sort((a, b) => absoluteMoment(a.day, a.slot) - absoluteMoment(b.day, b.slot))
+    .slice(0, limit);
+}
+
+function getLastContactMoment(state, npcId) {
+  const messageMoments = (state.messages || [])
+    .filter(message => message.npcId === npcId)
+    .map(message => ({ day: message.day, slot: message.slot, text: message.text, kind: "message" }));
+  const relationship = normalizeRelationshipRecord(state.player?.relationships?.[npcId], getKnownNpc(state, npcId));
+  const relationshipMoments = relationship.recentMoments || [];
+  const witnessed = (state.eventLog || [])
+    .filter(event => asArray(event.witnesses).includes(npcId))
+    .map(event => ({ day: event.day, slot: event.slot, text: eventSummary(event), kind: "event" }));
+  return [...messageMoments, ...relationshipMoments, ...witnessed]
+    .filter(moment => typeof moment.day === "number")
+    .sort((a, b) => absoluteMoment(b.day, b.slot) - absoluteMoment(a.day, a.slot))[0] || null;
+}
+
+function getNeglectedContacts(state) {
+  const now = absoluteMoment(state.day, state.timeSlot);
+  return (state.npcsKnown || [])
+    .map(npcId => {
+      const npc = getKnownNpc(state, npcId);
+      const last = getLastContactMoment(state, npcId);
+      const ageChunks = last ? now - absoluteMoment(last.day, last.slot) : CHUNKS_PER_DAY * 7;
+      return { npc, last, ageChunks };
+    })
+    .filter(item => item.ageChunks >= CHUNKS_PER_DAY * 2)
+    .sort((a, b) => b.ageChunks - a.ageChunks);
+}
+
+function getRecentSignificantMoments(state, limit = 6) {
+  const relationshipMoments = Object.entries(state.player?.relationships || {}).flatMap(([npcId, record]) => {
+    const npc = getKnownNpc(state, npcId);
+    return (normalizeRelationshipRecord(record, npc).recentMoments || []).map(moment => ({
+      ...moment,
+      label: `${npc.name || npcId}: ${moment.text}`,
+    }));
+  });
+  const eventMoments = (state.eventLog || [])
+    .filter(event => asArray(event.witnesses).length || /met|replied|committed|result/i.test(eventSummary(event)))
+    .map(event => ({ day: event.day, slot: event.slot, label: eventSummary(event) }));
+  return [...relationshipMoments, ...eventMoments]
+    .filter(moment => typeof moment.day === "number")
+    .sort((a, b) => absoluteMoment(b.day, b.slot) - absoluteMoment(a.day, a.slot))
+    .slice(0, limit);
+}
+
+function getAnthropLeads(state) {
+  const leads = [];
+  const unread = getUnreadCount(state);
+  const commitments = getUpcomingCommitments(state, 3);
+  const currentRequired = getCurrentCalendarItems(state).filter(item => item.required);
+  const presentHere = getNpcPresenceAtLocation(state, state.location, getNpcDirectory(state));
+  if (unread) leads.push({ id: "unread", title: `${unread} unread Pulse message${unread === 1 ? "" : "s"}`, detail: "Texting is live enough to decay if ignored." });
+  currentRequired.forEach(item => leads.push({ id: `class-${item.id}`, title: item.title, detail: `Happening now at ${LOCATIONS[item.location]?.label || item.location}.` }));
+  commitments.forEach(item => leads.push({ id: item.id, title: item.title, detail: `${formatMoment(item.day, item.slot)} at ${LOCATIONS[item.location]?.label || item.location}.` }));
+  presentHere.forEach(npc => leads.push({ id: `npc-${npc.id}`, title: `${npc.name || npc.id} is here`, detail: npc.scheduleNote || "A possible in-person beat." }));
+  if ((state.player?.resources?.energy || 0) < 25) leads.push({ id: "energy", title: "Energy is low", detail: "Wake, food, or coffee will matter before heavier plans." });
+  return leads.slice(0, 6);
+}
+
+function setWakeAlarm(state, alarmSlot) {
+  return {
+    ...state,
+    wake: {
+      ...(state.wake || {}),
+      alarmSlot: normalizeTimeSlot(alarmSlot),
+    },
+  };
+}
+
+function getMissedScheduleItemsBetween(state, targetDay, targetSlot) {
+  const start = absoluteMoment(state.day, state.timeSlot);
+  const end = absoluteMoment(targetDay, targetSlot);
+  const missed = [];
+  for (let day = state.day; day <= targetDay; day += 1) {
+    for (const item of getTodayCalendarItems(state, day)) {
+      const itemStart = absoluteMoment(day, item.slot);
+      const itemEnd = absoluteMoment(day, item.end ?? item.slot + 1);
+      if (item.required && itemEnd > start && itemStart < end) {
+        missed.push({
+          id: `${item.id}-${day}-${item.slot}`,
+          title: item.title,
+          location: item.location,
+          day,
+          slot: item.slot,
+        });
+      }
+    }
+  }
+  return missed;
+}
+
+function sleepUntilAlarm(state, alarmSlot = state.wake?.alarmSlot) {
+  const requestedSlot = normalizeTimeSlot(alarmSlot ?? timeChunk(7, 30));
+  const currentSlot = normalizeTimeSlot(state.timeSlot);
+  let targetDay = currentSlot < requestedSlot ? state.day : state.day + 1;
+  let targetSlot = requestedSlot;
+  const exhausted = (state.player?.resources?.energy || 0) < 20;
+  if (exhausted) {
+    const overslept = addChunksToMoment(targetDay, targetSlot, 2);
+    targetDay = overslept.day;
+    targetSlot = overslept.slot;
+  }
+
+  const chunks = Math.max(1, absoluteMoment(targetDay, targetSlot) - absoluteMoment(state.day, state.timeSlot));
+  const missed = getMissedScheduleItemsBetween(state, targetDay, targetSlot);
+  let next = advanceTime(state, chunks);
+  const energyGain = Math.min(100, Math.round(chunks * 2.4) + (exhausted ? 8 : 0));
+  next = changeResources(next, { energy: energyGain });
+  next = {
+    ...next,
+    wake: {
+      ...(next.wake || {}),
+      alarmSlot: requestedSlot,
+      lastSleep: { day: state.day, slot: state.timeSlot, wakeDay: next.day, wakeSlot: next.timeSlot, chunks, exhausted },
+    },
+    missedBlocks: [...(next.missedBlocks || []), ...missed].slice(-20),
+  };
+  next = appendEvent(next, `Slept until ${formatClockTime(next.timeSlot)}. Energy restored by ${energyGain}.`);
+  if (missed.length) {
+    next = appendEvent(next, `Missed ${missed.map(item => item.title).join(", ")} while sleeping.`);
+  }
+
+  return {
+    state: next,
+    notification: {
+      app: "Wake",
+      body: missed.length
+        ? `Woke at ${formatClockTime(next.timeSlot)} and missed ${missed.length} required block${missed.length === 1 ? "" : "s"}.`
+        : `Woke at ${formatClockTime(next.timeSlot)}. Energy is ${next.player.resources.energy}/100.`,
+    },
+  };
+}
+
+function processTimedSystems(state) {
+  let next = ensureBulletinBoard(state);
+  const buzz = processDailyBuzz(next);
+  next = buzz.state;
+  const pulse = processPendingMessages(next);
+  next = pulse.state;
+  return {
+    state: normalizeState(next),
+    notification: pulse.notification || buzz.notification,
+  };
+}
+
+function addMarginNote(state, text, meta = {}) {
   const trimmed = String(text || "").trim();
   if (!trimmed) return { state };
+  const currentCalendarItems = getCurrentCalendarItems(state);
+  const presentNpcs = getNpcPresenceAtLocation(state, state.location, getNpcDirectory(state));
+  const recentEvent = (state.eventLog || []).slice(-1)[0];
+  const locationLabel = LOCATIONS[state.location]?.label || state.location;
 
   const note = {
     id: `${state.day}-${state.timeSlot}-${Date.now()}`,
     day: state.day,
     slot: state.timeSlot,
+    location: state.location,
+    locationLabel,
+    context: meta.context || currentCalendarItems.map(item => item.title).join(", ") || locationLabel,
+    calendarIds: currentCalendarItems.map(item => item.id),
+    npcIds: presentNpcs.map(npc => npc.id),
+    event: recentEvent ? eventSummary(recentEvent) : null,
+    tags: uniqueCompact([
+      locationLabel,
+      ...currentCalendarItems.map(item => item.kind || item.title),
+      ...presentNpcs.map(npc => npc.name || npc.id),
+      ...asArray(meta.tags),
+    ]),
     text: trimmed,
   };
 
@@ -2349,38 +2901,62 @@ function PhoneHomeScreen({ state, onOpenApp }) {
         gap: "10px 12px",
         alignContent: "start",
       }}>
-        {APPS.map(app => (
-          <button
-            key={app.id}
-            onClick={() => onOpenApp(app.id)}
-            style={{
-              padding: 0, background: "transparent", border: "none", cursor: "pointer",
-              display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
-            }}
-          >
-            <div style={{
-              width: "100%", aspectRatio: "1 / 1",
-              borderRadius: "22%", overflow: "hidden",
-              boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
-            }}>
-              {ICON_SVGS[app.id] ? (
-                <InlineSvg svg={ICON_SVGS[app.id]} />
-              ) : (
-                <div style={{
-                  width: "100%", height: "100%",
-                  background: "#cbb892",
-                  display: "flex", alignItems: "center", justifyContent: "center",
-                  fontSize: 10, color: "#3a3530",
-                }}>?</div>
-              )}
-            </div>
-            <span style={{
-              fontSize: 9, color: "#3a3530",
-              fontFamily: "system-ui, sans-serif", fontWeight: 500,
-              letterSpacing: 0.2,
-            }}>{app.label}</span>
-          </button>
-        ))}
+        {APPS.map(app => {
+          const badge = app.id === "pulse" ? getUnreadCount(state) : 0;
+          return (
+            <button
+              key={app.id}
+              onClick={() => onOpenApp(app.id)}
+              style={{
+                padding: 0, background: "transparent", border: "none", cursor: "pointer",
+                display: "flex", flexDirection: "column", alignItems: "center", gap: 4,
+              }}
+            >
+              <div style={{
+                width: "100%", aspectRatio: "1 / 1",
+                borderRadius: "22%", overflow: "hidden",
+                boxShadow: "0 1px 3px rgba(0,0,0,0.18)",
+                position: "relative",
+              }}>
+                {ICON_SVGS[app.id] ? (
+                  <InlineSvg svg={ICON_SVGS[app.id]} />
+                ) : (
+                  <div style={{
+                    width: "100%", height: "100%",
+                    background: "#cbb892",
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    fontSize: 10, color: "#3a3530",
+                  }}>?</div>
+                )}
+                {badge > 0 && (
+                  <span style={{
+                    position: "absolute",
+                    top: 3,
+                    right: 3,
+                    minWidth: 16,
+                    height: 16,
+                    borderRadius: 999,
+                    background: "#c8a165",
+                    color: "#1a1814",
+                    fontSize: 9,
+                    fontWeight: 800,
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    border: "1px solid rgba(255,255,255,0.78)",
+                  }}>
+                    {badge}
+                  </span>
+                )}
+              </div>
+              <span style={{
+                fontSize: 9, color: "#3a3530",
+                fontFamily: "system-ui, sans-serif", fontWeight: 500,
+                letterSpacing: 0.2,
+              }}>{app.label}</span>
+            </button>
+          );
+        })}
       </div>
       {/* Home indicator */}
       <div style={{
@@ -2437,7 +3013,7 @@ function AppShell({ title, onBack, children, dark }) {
   );
 }
 
-function CompassApp({ state, onBack, onNavigate }) {
+function CompassApp({ state, onBack, onNavigate, onCommitBulletin }) {
   // Landscape map view
   const [transitMode, setTransitMode] = useState("walk");
   const groups = [
@@ -2447,6 +3023,8 @@ function CompassApp({ state, onBack, onNavigate }) {
   ];
   const here = state.location;
   const directory = getNpcDirectory(state);
+  const bulletinItems = state.location === "student_union" ? getBulletinItems(state) : [];
+  const upcomingCommitments = getUpcomingCommitments(state, 8);
 
   return (
     <AppShell title="Compass" onBack={onBack} dark>
@@ -2484,9 +3062,52 @@ function CompassApp({ state, onBack, onNavigate }) {
           })}
         </div>
       </div>
+      {bulletinItems.length > 0 && (
+        <PhoneSection title="Student Union Bulletin Board" dark>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 8 }}>
+            {bulletinItems.map(item => {
+              const committed = upcomingCommitments.some(commitment => commitment.sourceId === item.id);
+              return (
+                <article key={item.id} style={{
+                  border: "1px solid rgba(240,235,220,0.10)",
+                  borderRadius: 8,
+                  padding: 9,
+                  background: "rgba(200,161,101,0.08)",
+                  minHeight: 116,
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: 6,
+                }}>
+                  <div style={{ color: "#f0ebdc", fontSize: 12, fontWeight: 700, lineHeight: 1.25 }}>{item.title}</div>
+                  <p style={{ margin: 0, color: "rgba(240,235,220,0.70)", fontSize: 10, lineHeight: 1.35, flex: 1 }}>{item.body}</p>
+                  <div style={{ color: "#c8a165", fontSize: 9 }}>
+                    {formatMoment(item.day, item.slot)} · {LOCATIONS[item.location]?.label || item.location}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => onCommitBulletin?.(item.id)}
+                    disabled={committed}
+                    style={{
+                      border: `1px solid ${committed ? "rgba(240,235,220,0.10)" : "rgba(200,161,101,0.42)"}`,
+                      background: committed ? "rgba(240,235,220,0.04)" : "rgba(200,161,101,0.18)",
+                      color: committed ? "rgba(240,235,220,0.50)" : "#f0ebdc",
+                      borderRadius: 6,
+                      padding: "5px 6px",
+                      fontSize: 10,
+                      cursor: committed ? "default" : "pointer",
+                    }}
+                  >
+                    {committed ? "On radar" : "Track"}
+                  </button>
+                </article>
+              );
+            })}
+          </div>
+        </PhoneSection>
+      )}
       <div style={{
         display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14,
-        height: "calc(100% - 38px)",
+        minHeight: 300,
       }}>
         {groups.map(g => {
           const locs = Object.entries(LOCATIONS).filter(([_, v]) => v.cat === g.cat);
@@ -2508,22 +3129,26 @@ function CompassApp({ state, onBack, onNavigate }) {
                 {locs.map(([key, v]) => {
                   const isHere = key === here;
                   const travelPlan = getTravelPlan(state, key, transitMode);
+                  const travelFailure = !isHere ? canAffordTravel(state, travelPlan) : null;
+                  const isOpen = isLocationOpenAt(state, key);
                   const npcHits = getNpcPresenceAtLocation(state, key, directory);
                   const calendarHits = getCalendarItemsAtLocation(state, key);
-                  const hasIndicators = npcHits.length > 0 || calendarHits.length > 0 || travelPlan.chunks > 0;
+                  const disabled = isHere || !isOpen || Boolean(travelFailure);
+                  const hasIndicators = npcHits.length > 0 || calendarHits.length > 0 || travelPlan.chunks > 0 || !isOpen || key !== "dorm_room";
                   return (
                     <button
                       key={key}
-                      onClick={() => !isHere && onNavigate(key, transitMode)}
-                      disabled={isHere}
+                      onClick={() => !disabled && onNavigate(key, transitMode)}
+                      disabled={disabled}
+                      title={travelFailure || `${describeLocationOpenState(state, key)} · ${formatLocationHours(key)}`}
                       style={{
                         textAlign: "left",
                         padding: "8px 10px",
                         background: isHere ? "rgba(200,161,101,0.18)" : "transparent",
-                        border: `1px solid ${isHere ? "rgba(200,161,101,0.4)" : "rgba(240,235,220,0.08)"}`,
+                        border: `1px solid ${isHere ? "rgba(200,161,101,0.4)" : (!isOpen || travelFailure ? "rgba(240,235,220,0.05)" : "rgba(240,235,220,0.08)")}`,
                         borderRadius: 6,
-                        color: isHere ? "#c8a165" : "#f0ebdc",
-                        cursor: isHere ? "default" : "pointer",
+                        color: isHere ? "#c8a165" : (!isOpen || travelFailure ? "rgba(240,235,220,0.42)" : "#f0ebdc"),
+                        cursor: disabled ? "default" : "pointer",
                         fontSize: 12, fontFamily: "system-ui, sans-serif",
                         display: "block",
                         minHeight: hasIndicators ? 58 : 34,
@@ -2555,6 +3180,24 @@ function CompassApp({ state, onBack, onNavigate }) {
                               {item.required ? "Class" : item.title}
                             </span>
                           ))}
+                          <span style={{
+                            padding: "2px 5px",
+                            borderRadius: 999,
+                            background: isOpen ? "rgba(34,197,94,0.12)" : "rgba(248,113,113,0.12)",
+                            color: isOpen ? "#bbf7d0" : "#fecaca",
+                            fontSize: 9,
+                          }}>
+                            {isOpen ? "open" : "closed"}
+                          </span>
+                          <span style={{
+                            padding: "2px 5px",
+                            borderRadius: 999,
+                            background: "rgba(240,235,220,0.07)",
+                            color: "rgba(240,235,220,0.62)",
+                            fontSize: 9,
+                          }}>
+                            {formatLocationHours(key)}
+                          </span>
                           {!isHere && travelPlan.chunks > 0 && (
                             <span style={{
                               padding: "2px 5px",
@@ -2960,8 +3603,12 @@ function TimelineItem({ when, children, dark = false }) {
   );
 }
 
-function PulseApp({ state, onBack, onSendMessage }) {
+function PulseApp({ state, onBack, onSendMessage, onMarkRead }) {
   const contacts = (state.npcsKnown || []).map(key => getKnownNpc(state, key)).filter(Boolean);
+  const [selectedId, setSelectedId] = useState(contacts[0]?.id || null);
+  const selected = contacts.find(contact => contact.id === selectedId) || contacts[0];
+  const thread = selected ? (state.messages || []).filter(message => message.npcId === selected.id) : [];
+  const pending = selected ? (state.pendingMessages || []).filter(message => message.npcId === selected.id) : [];
   const actionStyle = {
     border: "1px solid rgba(58,53,48,0.12)",
     background: "rgba(200,161,101,0.14)",
@@ -2971,6 +3618,10 @@ function PulseApp({ state, onBack, onSendMessage }) {
     fontSize: 11,
     cursor: "pointer",
   };
+
+  useEffect(() => {
+    if (selected?.id) onMarkRead?.(selected.id);
+  }, [selected?.id, onMarkRead]);
 
   return (
     <AppShell title="Pulse" onBack={onBack}>
@@ -2982,15 +3633,71 @@ function PulseApp({ state, onBack, onSendMessage }) {
           No contacts yet.
         </div>
       ) : (
-        contacts.map(contact => {
-          const thread = (state.messages || []).filter(message => message.npcId === contact.id).slice(-4);
-          return (
-            <PhoneSection key={contact.id}>
-              <div style={{ marginBottom: 10 }}>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>{contact.name}</div>
-                <div style={{ fontSize: 11, color: "#7a6e58" }}>{contact.role || "Contact"}</div>
-              </div>
-              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10 }}>
+        <>
+          <PhoneSection title="Threads">
+            <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 7 }}>
+              {contacts.map(contact => {
+                const unread = getUnreadCount(state, contact.id);
+                const active = selected?.id === contact.id;
+                const lastMessage = (state.messages || []).filter(message => message.npcId === contact.id).slice(-1)[0];
+                return (
+                  <button
+                    key={contact.id}
+                    type="button"
+                    onClick={() => {
+                      setSelectedId(contact.id);
+                      onMarkRead?.(contact.id);
+                    }}
+                    style={{
+                      border: `1px solid ${active ? "rgba(200,161,101,0.40)" : "rgba(58,53,48,0.09)"}`,
+                      borderRadius: 8,
+                      background: active ? "rgba(200,161,101,0.16)" : "rgba(255,255,255,0.30)",
+                      padding: "8px 9px",
+                      display: "flex",
+                      gap: 8,
+                      alignItems: "center",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      color: "#3a3530",
+                    }}
+                  >
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 12, fontWeight: 700 }}>{contact.name}</div>
+                      <div style={{
+                        color: "#7a6e58",
+                        fontSize: 10,
+                        whiteSpace: "nowrap",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                      }}>
+                        {lastMessage ? lastMessage.text : contact.role || "No messages yet"}
+                      </div>
+                    </div>
+                    {unread > 0 && (
+                      <span style={{
+                        minWidth: 20,
+                        height: 20,
+                        borderRadius: 999,
+                        background: "#c8a165",
+                        color: "#1a1814",
+                        fontSize: 10,
+                        fontWeight: 800,
+                        display: "flex",
+                        alignItems: "center",
+                        justifyContent: "center",
+                      }}>
+                        {unread}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </PhoneSection>
+
+          {selected && (
+            <PhoneSection title={selected.name}>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 10, minHeight: 110 }}>
                 {thread.length ? thread.map(message => {
                   const incoming = message.direction === "incoming";
                   return (
@@ -2998,7 +3705,7 @@ function PulseApp({ state, onBack, onSendMessage }) {
                       alignSelf: incoming ? "flex-start" : "flex-end",
                       maxWidth: "86%",
                       padding: "7px 9px",
-                      borderRadius: 10,
+                      borderRadius: incoming ? "10px 10px 10px 3px" : "10px 10px 3px 10px",
                       background: incoming ? "rgba(58,53,48,0.08)" : "rgba(200,161,101,0.24)",
                       color: "#3a3530",
                       fontSize: 12,
@@ -3011,45 +3718,101 @@ function PulseApp({ state, onBack, onSendMessage }) {
                 }) : (
                   <div style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No messages yet.</div>
                 )}
+                {pending.map(message => (
+                  <div key={message.id} style={{
+                    alignSelf: "flex-start",
+                    maxWidth: "86%",
+                    padding: "7px 9px",
+                    borderRadius: "10px 10px 10px 3px",
+                    border: "1px dashed rgba(58,53,48,0.16)",
+                    color: "#7a6e58",
+                    fontSize: 11,
+                    lineHeight: 1.35,
+                    background: "rgba(58,53,48,0.03)",
+                  }}>
+                    Reply expected around {formatClockTime(message.dueSlot)}.
+                  </div>
+                ))}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 6 }}>
-                <button type="button" onClick={() => onSendMessage(contact.id, "check_in")} style={actionStyle}>Check in</button>
-                <button type="button" onClick={() => onSendMessage(contact.id, "ask_about_day")} style={actionStyle}>Ask about day</button>
-                <button type="button" onClick={() => onSendMessage(contact.id, "invite_coffee")} style={actionStyle}>Invite coffee</button>
+                <button type="button" onClick={() => onSendMessage(selected.id, "check_in")} style={actionStyle}>Check in</button>
+                <button type="button" onClick={() => onSendMessage(selected.id, "ask_about_day")} style={actionStyle}>Ask about day</button>
+                <button type="button" onClick={() => onSendMessage(selected.id, "invite_coffee")} style={actionStyle}>Invite coffee</button>
               </div>
             </PhoneSection>
-          );
-        })
+          )}
+        </>
       )}
     </AppShell>
   );
 }
 
 function BuzzApp({ state, onBack }) {
+  const feed = getBuzzFeed(state);
   const offset = state.day % BUZZ_FEED_ITEMS.length;
-  const feed = [...BUZZ_FEED_ITEMS.slice(offset), ...BUZZ_FEED_ITEMS.slice(0, offset)].slice(0, 4);
+  const campusTicker = [...BUZZ_FEED_ITEMS.slice(offset), ...BUZZ_FEED_ITEMS.slice(0, offset)].slice(0, 3);
   const recent = (state.eventLog || []).slice(-4).reverse();
 
   return (
     <AppShell title="Buzz" onBack={onBack} dark>
       <PhoneSection title="Campus Pulse" dark>
         <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, color: "#f0ebdc" }}>
-          {LOCATIONS[state.location]?.label || state.location} is trending around your current orbit.
+          {LOCATIONS[state.location]?.label || state.location} is in your current orbit. Cached posts update as time moves.
         </p>
       </PhoneSection>
       <PhoneSection title="Feed" dark>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-          {feed.map((item, index) => (
-            <article key={item} style={{
+          {feed.map((post, index) => (
+            <article key={post.id || `${post.text}-${index}`} style={{
               border: "1px solid rgba(240,235,220,0.10)",
               borderRadius: 8,
               padding: 10,
               background: "rgba(200,161,101,0.08)",
-              minHeight: 82,
+              minHeight: 96,
             }}>
-              <small style={{ color: "#c8a165", fontSize: 10 }}>#{index + 1}</small>
-              <p style={{ margin: "4px 0 0", color: "#f0ebdc", fontSize: 12, lineHeight: 1.36 }}>{item}</p>
+              <small style={{ color: "#c8a165", fontSize: 10 }}>
+                {post.author || "Campus Buzz"} · {formatMoment(post.day, post.slot)}
+              </small>
+              <p style={{ margin: "4px 0 6px", color: "#f0ebdc", fontSize: 12, lineHeight: 1.36 }}>{post.text}</p>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 4 }}>
+                <span style={{
+                  padding: "2px 5px",
+                  borderRadius: 999,
+                  background: "rgba(240,235,220,0.08)",
+                  color: "rgba(240,235,220,0.62)",
+                  fontSize: 9,
+                }}>
+                  {post.source}
+                </span>
+                {post.location && (
+                  <span style={{
+                    padding: "2px 5px",
+                    borderRadius: 999,
+                    background: "rgba(56,189,248,0.12)",
+                    color: "#bae6fd",
+                    fontSize: 9,
+                  }}>
+                    {LOCATIONS[post.location]?.label || post.location}
+                  </span>
+                )}
+              </div>
             </article>
+          ))}
+        </div>
+      </PhoneSection>
+      <PhoneSection title="Ticker" dark>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {campusTicker.map(item => (
+            <div key={item} style={{
+              border: "1px solid rgba(240,235,220,0.08)",
+              borderRadius: 8,
+              padding: "7px 9px",
+              color: "rgba(240,235,220,0.74)",
+              fontSize: 11,
+              lineHeight: 1.35,
+            }}>
+              {item}
+            </div>
           ))}
         </div>
       </PhoneSection>
@@ -3071,12 +3834,16 @@ function AnthropApp({ state, onBack }) {
   const statEntries = Object.entries(stats);
   const weak = statEntries.slice().sort((a, b) => a[1] - b[1])[0]?.[0] || "knowledge";
   const strong = statEntries.slice().sort((a, b) => b[1] - a[1])[0]?.[0] || "charm";
-  const recentEvents = (state.eventLog || []).slice(-5).reverse();
   const relationshipEntries = Object.entries(state.player.relationships || {});
   const moment = getCalendarMoment(state);
   const currentCalendarItems = getCurrentCalendarItems(state);
   const upcomingItems = getUpcomingCalendarItems(state, 5);
   const presentHere = getNpcPresenceAtLocation(state, state.location, getNpcDirectory(state));
+  const activeLeads = getAnthropLeads(state);
+  const commitments = getUpcomingCommitments(state, 5);
+  const neglectedContacts = getNeglectedContacts(state);
+  const significantMoments = getRecentSignificantMoments(state, 6);
+  const missedBlocks = (state.missedBlocks || []).slice(-4).reverse();
 
   return (
     <AppShell title="Anthrop" onBack={onBack} dark>
@@ -3088,6 +3855,25 @@ function AnthropApp({ state, onBack }) {
         <p style={{ margin: 0, color: "rgba(240,235,220,0.72)", fontSize: 12 }}>
           Energy is {state.player.resources.energy}/100 and money is ${state.player.resources.money}.
         </p>
+      </PhoneSection>
+      <PhoneSection title="Active Leads" dark>
+        {activeLeads.length ? (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            {activeLeads.map(lead => (
+              <article key={lead.id} style={{
+                border: "1px solid rgba(240,235,220,0.10)",
+                borderRadius: 8,
+                padding: "8px 10px",
+                background: "rgba(200,161,101,0.08)",
+              }}>
+                <div style={{ color: "#f0ebdc", fontSize: 12, fontWeight: 700 }}>{lead.title}</div>
+                <p style={{ margin: "4px 0 0", color: "rgba(240,235,220,0.68)", fontSize: 11, lineHeight: 1.35 }}>{lead.detail}</p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>No urgent leads right now.</p>
+        )}
       </PhoneSection>
       <PhoneSection title="Calendar" dark>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -3120,6 +3906,24 @@ function AnthropApp({ state, onBack }) {
             )}
           </div>
         </div>
+      </PhoneSection>
+      <PhoneSection title="Commitments" dark>
+        {commitments.length ? commitments.map(item => (
+          <TimelineItem dark when={formatMoment(item.day, item.slot)} key={item.id}>
+            {item.title} at {LOCATIONS[item.location]?.label || item.location}
+          </TimelineItem>
+        )) : (
+          <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>No tracked commitments yet.</p>
+        )}
+      </PhoneSection>
+      <PhoneSection title="Neglected Contacts" dark>
+        {neglectedContacts.length ? neglectedContacts.map(({ npc, last, ageChunks }) => (
+          <TimelineItem dark when={last ? formatMoment(last.day, last.slot) : "No contact logged"} key={npc.id}>
+            {npc.name || npc.id} has been quiet for about {formatDuration(ageChunks)}.
+          </TimelineItem>
+        )) : (
+          <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>No neglected contacts yet.</p>
+        )}
       </PhoneSection>
       <PhoneSection title="Suggestions" dark>
         <ul style={{ margin: 0, paddingLeft: 18, color: "#f0ebdc", fontSize: 12, lineHeight: 1.55 }}>
@@ -3156,22 +3960,44 @@ function AnthropApp({ state, onBack }) {
           <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>No relationship records yet.</p>
         )}
       </PhoneSection>
-      <PhoneSection title="Recent" dark>
-        {recentEvents.length ? recentEvents.map((event, index) => (
-          <TimelineItem dark when={formatMoment(event.day, event.slot || 0)} key={`${event.day}-${event.slot}-${index}`}>
-            {eventSummary(event)}
+      <PhoneSection title="Recent Significant Moments" dark>
+        {significantMoments.length ? significantMoments.map((moment, index) => (
+          <TimelineItem dark when={formatMoment(moment.day, moment.slot || 0)} key={`${moment.label}-${index}`}>
+            {moment.label}
           </TimelineItem>
         )) : (
           <p style={{ color: "rgba(240,235,220,0.56)", fontSize: 12, fontStyle: "italic" }}>No events logged yet.</p>
         )}
       </PhoneSection>
+      {!!missedBlocks.length && (
+        <PhoneSection title="Missed Blocks" dark>
+          {missedBlocks.map(block => (
+            <TimelineItem dark when={formatMoment(block.day, block.slot)} key={block.id}>
+              {block.title} at {LOCATIONS[block.location]?.label || block.location}
+            </TimelineItem>
+          ))}
+        </PhoneSection>
+      )}
     </AppShell>
   );
 }
 
 function MarginApp({ state, onBack, onAddNote }) {
   const [draft, setDraft] = useState("");
+  const [query, setQuery] = useState("");
   const recentEvents = (state.eventLog || []).slice(-12).reverse();
+  const normalizedQuery = query.trim().toLowerCase();
+  const notes = (state.notes || []).slice().reverse();
+  const filteredNotes = normalizedQuery
+    ? notes.filter(note => [
+      note.text,
+      note.locationLabel,
+      note.context,
+      note.event,
+      ...(note.tags || []),
+      ...(note.npcIds || []).map(npcId => getKnownNpc(state, npcId)?.name || npcId),
+    ].join(" ").toLowerCase().includes(normalizedQuery))
+    : notes;
   const submitNote = () => {
     if (!draft.trim()) return;
     onAddNote(draft);
@@ -3223,11 +4049,41 @@ function MarginApp({ state, onBack, onAddNote }) {
           Add note
         </button>
       </PhoneSection>
+      <PhoneSection title="Search">
+        <input
+          value={query}
+          onChange={event => setQuery(event.target.value)}
+          placeholder="Search notes, places, people, classes..."
+          style={{
+            width: "100%",
+            boxSizing: "border-box",
+            border: "1px solid rgba(58,53,48,0.14)",
+            borderRadius: 8,
+            padding: "8px 10px",
+            fontFamily: "system-ui, sans-serif",
+            fontSize: 12,
+            background: "rgba(255,255,255,0.45)",
+            color: "#3a3530",
+            outline: "none",
+          }}
+        />
+      </PhoneSection>
       <PhoneSection title="Notes">
-        {(state.notes || []).length ? state.notes.slice().reverse().map(note => (
-          <TimelineItem when={noteMoment(note)} key={note.id}>{note.text}</TimelineItem>
+        {filteredNotes.length ? filteredNotes.map(note => (
+          <TimelineItem when={`${noteMoment(note)} · ${note.locationLabel || LOCATIONS[note.location]?.label || "Unknown place"}`} key={note.id}>
+            <span>{note.text}</span>
+            {(note.context || (note.tags || []).length || note.event) && (
+              <span style={{ display: "block", marginTop: 6, color: "#7a6e58", fontSize: 10, lineHeight: 1.35 }}>
+                {note.context ? `Context: ${note.context}. ` : ""}
+                {(note.tags || []).length ? `Tags: ${(note.tags || []).join(", ")}. ` : ""}
+                {note.event ? `Linked: ${note.event}` : ""}
+              </span>
+            )}
+          </TimelineItem>
         )) : (
-          <p style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No notes yet.</p>
+          <p style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>
+            {(state.notes || []).length ? "No notes match that search." : "No notes yet."}
+          </p>
         )}
       </PhoneSection>
       <PhoneSection title="Recent Log">
@@ -3237,6 +4093,100 @@ function MarginApp({ state, onBack, onAddNote }) {
           </TimelineItem>
         )) : (
           <p style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>No events logged yet.</p>
+        )}
+      </PhoneSection>
+    </AppShell>
+  );
+}
+
+function WakeApp({ state, onBack, onSetAlarm, onSleep }) {
+  const alarmSlot = state.wake?.alarmSlot ?? timeChunk(7, 30);
+  const lastSleep = state.wake?.lastSleep;
+  const missedBlocks = (state.missedBlocks || []).slice(-4).reverse();
+  const currentEnergy = state.player?.resources?.energy ?? 0;
+  const nextAlarmDay = normalizeTimeSlot(state.timeSlot) < alarmSlot ? state.day : state.day + 1;
+  const sleepChunks = Math.max(1, absoluteMoment(nextAlarmDay, alarmSlot) - absoluteMoment(state.day, state.timeSlot));
+
+  return (
+    <AppShell title="Wake" onBack={onBack}>
+      <PhoneSection title="Alarm">
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 12, marginBottom: 10 }}>
+          <div>
+            <div style={{ fontSize: 28, fontWeight: 800, color: "#3a3530", lineHeight: 1 }}>{formatClockTime(alarmSlot)}</div>
+            <div style={{ fontSize: 11, color: "#7a6e58", marginTop: 4 }}>
+              Sleep window: {formatDuration(sleepChunks)}
+            </div>
+          </div>
+          <div style={{ textAlign: "right", fontSize: 11, color: "#7a6e58" }}>
+            Energy<br />
+            <strong style={{ color: "#3a3530", fontSize: 16 }}>{currentEnergy}/100</strong>
+          </div>
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 7 }}>
+          {WAKE_ALARMS.map(slot => {
+            const active = normalizeTimeSlot(slot) === normalizeTimeSlot(alarmSlot);
+            return (
+              <button
+                type="button"
+                key={slot}
+                onClick={() => onSetAlarm(slot)}
+                style={{
+                  border: `1px solid ${active ? "rgba(200,161,101,0.42)" : "rgba(58,53,48,0.10)"}`,
+                  background: active ? "rgba(200,161,101,0.18)" : "rgba(255,255,255,0.35)",
+                  color: "#3a3530",
+                  borderRadius: 8,
+                  padding: "8px 10px",
+                  fontSize: 12,
+                  fontWeight: active ? 700 : 500,
+                  cursor: "pointer",
+                }}
+              >
+                {formatClockTime(slot)}
+              </button>
+            );
+          })}
+        </div>
+        <button
+          type="button"
+          onClick={() => onSleep(alarmSlot)}
+          style={{
+            marginTop: 10,
+            width: "100%",
+            border: "1px solid rgba(58,53,48,0.14)",
+            background: "#3a3530",
+            color: "#f0ebdc",
+            borderRadius: 8,
+            padding: "10px 12px",
+            fontSize: 13,
+            fontWeight: 700,
+            cursor: "pointer",
+          }}
+        >
+          Sleep until alarm
+        </button>
+      </PhoneSection>
+
+      <PhoneSection title="Risk">
+        <p style={{ margin: 0, color: "#3a3530", fontSize: 12, lineHeight: 1.45 }}>
+          If energy is below 20, exhaustion can push the wake time back by 30 minutes. Required class blocks crossed while asleep are recorded as missed.
+        </p>
+      </PhoneSection>
+
+      {lastSleep && (
+        <PhoneSection title="Last Sleep">
+          <TimelineItem when={`${formatMoment(lastSleep.day, lastSleep.slot)} to ${formatMoment(lastSleep.wakeDay, lastSleep.wakeSlot)}`}>
+            Slept for {formatDuration(lastSleep.chunks)}{lastSleep.exhausted ? " and overslept from exhaustion." : "."}
+          </TimelineItem>
+        </PhoneSection>
+      )}
+
+      <PhoneSection title="Missed Blocks">
+        {missedBlocks.length ? missedBlocks.map(block => (
+          <TimelineItem when={formatMoment(block.day, block.slot)} key={block.id}>
+            {block.title} at {LOCATIONS[block.location]?.label || block.location}
+          </TimelineItem>
+        )) : (
+          <p style={{ color: "#7a6e58", fontSize: 12, fontStyle: "italic" }}>Nothing missed by sleep yet.</p>
         )}
       </PhoneSection>
     </AppShell>
@@ -3374,8 +4324,10 @@ export default function StudentBody() {
   const handleNavigate = useCallback((locationKey, transitMode = "walk") => {
     if (!state) return;
     const update = navigateToLocation(state, locationKey, transitMode);
-    setState(normalizeState(update.state));
+    const processed = processTimedSystems(update.state);
+    setState(processed.state);
     if (update.notification) setTimeout(() => showNotif(update.notification), 200);
+    else if (processed.notification) setTimeout(() => showNotif(processed.notification), 500);
     if (update.state.location !== state.location) {
       setPhone({ open: false, view: "home", orientation: "portrait" });
     }
@@ -3384,11 +4336,13 @@ export default function StudentBody() {
   const handleChoice = useCallback((choice) => {
     setState(s => {
       const update = applyChoice(s, choice);
+      const processed = processTimedSystems(update.state);
       if (update.notification) {
         const delay = update.notification.app === "Pulse" ? 1500 : 600;
         setTimeout(() => showNotif(update.notification), delay);
       }
-      return normalizeState(update.state);
+      if (processed.notification) setTimeout(() => showNotif(processed.notification), update.notification ? 2200 : 700);
+      return processed.state;
     });
   }, [showNotif]);
 
@@ -3400,9 +4354,35 @@ export default function StudentBody() {
     });
   }, [showNotif]);
 
+  const handleMarkPulseRead = useCallback((npcId) => {
+    setState(s => normalizeState(markPulseThreadRead(s, npcId)));
+  }, []);
+
+  const handleCommitBulletin = useCallback((flyerId) => {
+    setState(s => {
+      const update = commitToBulletin(s, flyerId);
+      if (update.notification) setTimeout(() => showNotif(update.notification), 200);
+      return normalizeState(update.state);
+    });
+  }, [showNotif]);
+
   const handleAddNote = useCallback((text) => {
     setState(s => normalizeState(addMarginNote(s, text).state));
   }, []);
+
+  const handleSetAlarm = useCallback((alarmSlot) => {
+    setState(s => normalizeState(setWakeAlarm(s, alarmSlot)));
+  }, []);
+
+  const handleSleep = useCallback((alarmSlot) => {
+    setState(s => {
+      const update = sleepUntilAlarm(s, alarmSlot);
+      const processed = processTimedSystems(update.state);
+      if (update.notification) setTimeout(() => showNotif(update.notification), 200);
+      if (processed.notification) setTimeout(() => showNotif(processed.notification), 1400);
+      return processed.state;
+    });
+  }, [showNotif]);
 
   if (!loaded || !state) {
     return (
@@ -3428,13 +4408,14 @@ export default function StudentBody() {
     const appId = phone.view.slice(4);
     const app = APP_BY_ID[appId];
     if (!app) phoneContent = <PhoneHomeScreen state={state} onOpenApp={openApp} />;
-    else if (appId === "compass") phoneContent = <CompassApp state={state} onBack={backToHome} onNavigate={handleNavigate} />;
-    else if (appId === "pulse")   phoneContent = <PulseApp   state={state} onBack={backToHome} onSendMessage={handleSendMessage} />;
+    else if (appId === "compass") phoneContent = <CompassApp state={state} onBack={backToHome} onNavigate={handleNavigate} onCommitBulletin={handleCommitBulletin} />;
+    else if (appId === "pulse")   phoneContent = <PulseApp   state={state} onBack={backToHome} onSendMessage={handleSendMessage} onMarkRead={handleMarkPulseRead} />;
     else if (appId === "roster")  phoneContent = <RosterApp  state={state} onBack={backToHome} />;
     else if (appId === "self")    phoneContent = <SelfApp    state={state} onBack={backToHome} />;
     else if (appId === "buzz")    phoneContent = <BuzzApp    state={state} onBack={backToHome} />;
     else if (appId === "anthrop") phoneContent = <AnthropApp state={state} onBack={backToHome} />;
     else if (appId === "margin")  phoneContent = <MarginApp  state={state} onBack={backToHome} onAddNote={handleAddNote} />;
+    else if (appId === "wake")    phoneContent = <WakeApp    state={state} onBack={backToHome} onSetAlarm={handleSetAlarm} onSleep={handleSleep} />;
     else                          phoneContent = <StubApp    app={app}     onBack={backToHome} />;
   }
 
