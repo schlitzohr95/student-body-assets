@@ -1,6 +1,7 @@
 import { DAY_LABELS, formatTimeOfDay, LOCATIONS } from "../data/locations";
 import { getChemistryObservationsForNpc } from "../engine/chemistry";
 import { getLocationDirectory, getNpcsAtLocation, getScheduledNpcDirectory } from "../engine/calendar";
+import { getRelationshipRecord } from "../engine/relationships";
 import type { GameEvent, GameState, LocationDefinition, Npc } from "../types/game";
 
 const NARRATOR_EVENT_LIMIT = 10;
@@ -37,27 +38,20 @@ function getPresentNpcs(state: GameState, directory: Record<string, Npc>): Npc[]
 }
 
 function relationshipForNpc(state: GameState, npc: Npc) {
-  const relationships = state.player.relationships || {};
-  const record = relationships[npc.id] || (npc.portraitKey ? relationships[npc.portraitKey] : undefined) || relationships[npc.name];
-
-  if (record && typeof record === "object") {
-    return {
-      score: record.score ?? record.value ?? record.affinity ?? "unknown",
-      status: record.status || record.summary || record.label || "recorded",
-      traits: uniqueCompact(record.traits || []),
-      lastSeenDisposition: record.lastSeenDisposition || record.disposition,
-    };
-  }
-
-  if (typeof record === "number" || typeof record === "string") {
-    return { score: record, status: "recorded", traits: [], lastSeenDisposition: npc.lastSeenDisposition };
-  }
+  const record = getRelationshipRecord(state, npc.id || npc.portraitKey || npc.name);
 
   return {
-    score: 0,
-    status: "no relationship record yet",
-    traits: [],
-    lastSeenDisposition: npc.lastSeenDisposition || "No prior disposition recorded.",
+    score: record.score ?? record.value ?? record.affinity ?? "unknown",
+    status: record.status || record.summary || record.label || "recorded",
+    traits: uniqueCompact(record.traits || []),
+    flags: record.flags || {},
+    recentMoments: (record.recentMoments || []).slice(-3).map(moment => ({
+      label: moment.label,
+      text: moment.text,
+      day: moment.day,
+      time: formatTimeOfDay(moment.slot),
+    })),
+    lastSeenDisposition: record.lastSeenDisposition || record.disposition || npc.lastSeenDisposition,
   };
 }
 
@@ -129,6 +123,8 @@ export function buildNarratorContext(state: GameState, action?: string | { label
       score: relationship.score,
       status: relationship.status,
       traits: relationship.traits,
+      flags: relationship.flags,
+      recentMoments: relationship.recentMoments,
       lastSeenDisposition: relationship.lastSeenDisposition || npc.lastSeenDisposition || "No prior disposition recorded.",
     };
   });
@@ -148,6 +144,8 @@ export function buildNarratorContext(state: GameState, action?: string | { label
         score: relationship.score,
         status: relationship.status,
         traits: relationship.traits,
+        flags: relationship.flags,
+        recentMoments: relationship.recentMoments,
       },
     };
   });

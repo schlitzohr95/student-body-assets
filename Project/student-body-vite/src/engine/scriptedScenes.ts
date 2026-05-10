@@ -1,6 +1,7 @@
 import type { GameState, Scene } from "../types/game";
 import { getDaypartLabel } from "../data/locations";
 import { getLocationDirectory, getNpcsAtLocation } from "./calendar";
+import { gateChoice } from "./relationships";
 
 export function getScriptedScene(state: GameState): Scene {
   const { location, day, timeSlot, metMari, introSeen } = state;
@@ -36,6 +37,18 @@ export function getScriptedScene(state: GameState): Scene {
       choices: [
         { id: "sit_window", label: "Take the window booth and study" },
         { id: "chat_counter", label: "Lean on the counter and chat" },
+        gateChoice(
+          state,
+          { id: "ask_mari_about_marcus", label: "Ask how she knows Marcus" },
+          { npcId: "studious", minScore: 2, minTrust: 1 },
+          "Build a little trust with Mari first.",
+        ),
+        gateChoice(
+          state,
+          { id: "suggest_after_shift", label: "Suggest coffee after her shift" },
+          { npcId: "studious", minScore: 4, minTrust: 2, flags: { texting: true } },
+          "Needs texting rapport with Mari.",
+        ),
         { id: "leave", label: "Just grab something to go" },
       ],
     };
@@ -119,6 +132,14 @@ export function getScriptedScene(state: GameState): Scene {
         "Your room is starting to look less like a storage unit and more like a place you might actually sleep. The quiet is useful, if you can keep from wasting it.",
       choices: [
         { id: "review_notes", label: "Review class notes" },
+        metMari
+          ? gateChoice(
+              state,
+              { id: "ask_marcus_about_mari", label: "Ask Marcus about Mari" },
+              { npcId: "roommate", minTrust: 2 },
+              "Marcus needs to trust the question won't turn into drama.",
+            )
+          : { id: "ask_marcus_about_mari", label: "Ask Marcus about Mari", disabledReason: "Meet Mari first." },
         { id: "rest", label: "Rest for a while" },
         { id: "tidy_room", label: "Put the room in order" },
       ],

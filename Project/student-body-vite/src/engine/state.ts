@@ -1,6 +1,7 @@
 import type { GameEvent, GameState, TimeSlotIndex } from "../types/game";
 import { CHUNKS_PER_DAY, DEFAULT_ACTION_CHUNKS, normalizeTimeSlot, timeChunk } from "../data/locations";
 import { makeInitialLocationKnowledge, normalizeLocationKnowledge } from "./locationKnowledge";
+import { normalizeRelationships } from "./relationships";
 
 export function makeFreshState(): GameState {
   return {
@@ -16,7 +17,26 @@ export function makeFreshState(): GameState {
       stats: { knowledge: 30, athletics: 25, charm: 35, sensitivity: 40, grit: 30 },
       resources: { energy: 80, money: 50 },
       traits: [],
-      relationships: {},
+      relationships: {
+        roommate: {
+          score: 4,
+          status: "old friend",
+          traits: ["shared history"],
+          flags: { trust: 2, awkward: 0, texting: true, date_planned: false },
+          lastSeenDisposition: "Familiar and friendly.",
+          recentMoments: [
+            {
+              id: "start-roommate-fridge-note",
+              day: 1,
+              slot: timeChunk(8),
+              location: "dorm_room",
+              label: "Fridge note",
+              text: "Marcus left a casual coffee shop recommendation and a tiny map before heading out.",
+              tags: ["intro", "roommate"],
+            },
+          ],
+        },
+      },
     },
     narrator: {
       mode: "scripted",
@@ -52,6 +72,14 @@ function migrateTimedRecords<T extends { slot?: number | string }>(records: T[] 
 export function normalizeState(state: GameState): GameState {
   const fresh = makeFreshState();
   const legacyTimeScale = state.timeScale !== "quarter-hour" && (state.version || 1) < 2;
+  const mergedForRelationshipNormalization = {
+    ...fresh,
+    ...state,
+    player: {
+      ...fresh.player,
+      ...state.player,
+    },
+  };
   return {
     ...fresh,
     ...state,
@@ -64,7 +92,7 @@ export function normalizeState(state: GameState): GameState {
       stats: { ...fresh.player.stats, ...state.player?.stats },
       resources: { ...fresh.player.resources, ...state.player?.resources },
       traits: state.player?.traits || [],
-      relationships: state.player?.relationships || {},
+      relationships: normalizeRelationships(mergedForRelationshipNormalization),
     },
     narrator: {
       mode: state.narrator?.mode || "scripted",

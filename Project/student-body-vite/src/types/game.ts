@@ -14,10 +14,22 @@ export interface PlayerResources {
   money: number;
 }
 
+export interface RelationshipMoment {
+  id: string;
+  day: number;
+  slot: TimeSlotIndex;
+  location?: LocationId;
+  label: string;
+  text: string;
+  tags?: string[];
+}
+
 export interface RelationshipRecord {
   score: number | string;
   status?: string;
   traits?: string[];
+  flags?: Record<string, boolean | number | string>;
+  recentMoments?: RelationshipMoment[];
   lastSeenDisposition?: string;
   disposition?: string;
   summary?: string;
@@ -330,6 +342,7 @@ export interface Choice {
   id: string;
   label: string;
   tag?: string;
+  disabledReason?: string;
 }
 
 export interface Scene {
@@ -366,14 +379,8 @@ export interface GameState {
   npcMoods?: Record<NpcId, string>;
   presentNpcIds?: NpcId[];
   presentNpcs?: Array<NpcId | Npc>;
-  scene?: {
-    presentNpcIds?: NpcId[];
-    npcsPresent?: Array<NpcId | Npc>;
-  };
-  currentScene?: {
-    presentNpcIds?: NpcId[];
-    npcsPresent?: Array<NpcId | Npc>;
-  };
+  scene?: { presentNpcIds?: NpcId[]; npcsPresent?: Array<NpcId | Npc>; };
+  currentScene?: { presentNpcIds?: NpcId[]; npcsPresent?: Array<NpcId | Npc>; };
   world?: GameWorldState;
   flags?: Record<string, unknown>;
 }
@@ -388,10 +395,7 @@ export interface PhoneAppDefinition {
 
 export interface GameUpdate {
   state: GameState;
-  notification?: {
-    app: string;
-    body: string;
-  };
+  notification?: { app: string; body: string };
 }
 
 export interface NarratorParsedResponse {

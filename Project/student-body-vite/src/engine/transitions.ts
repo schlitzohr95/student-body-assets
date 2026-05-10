@@ -6,6 +6,7 @@ import { updateRoommateStudiousChemistry } from "./chemistry";
 import { addAcademicPrep } from "./academics";
 import { getLocationDirectory, maybeIssueCalendarReminder } from "./calendar";
 import { learnLocation, visitLocation } from "./locationKnowledge";
+import { addSharedMoment, addSharedMomentForMany, getRelationshipFlag, updateRelationship } from "./relationships";
 import { getTravelPlan } from "./travel";
 
 const messageResponses: Record<string, string> = {
@@ -39,27 +40,6 @@ function changeResources(state: GameState, changes: Partial<Record<"energy" | "m
   if (typeof changes.energy === "number") resources.energy = clamp(resources.energy + changes.energy);
   if (typeof changes.money === "number") resources.money = Math.max(0, resources.money + changes.money);
   return { ...state, player: { ...state.player, resources } };
-}
-
-function changeRelationship(state: GameState, npcId: NpcId, delta: number, status?: string): GameState {
-  const current = state.player.relationships?.[npcId];
-  const currentScore = typeof current === "object" && current ? Number(current.score) || 0 : typeof current === "number" ? current : 0;
-  const currentRecord = typeof current === "object" && current ? current : undefined;
-
-  return {
-    ...state,
-    player: {
-      ...state.player,
-      relationships: {
-        ...(state.player.relationships || {}),
-        [npcId]: {
-          ...(currentRecord || {}),
-          score: currentScore + delta,
-          status: status || (typeof currentRecord?.status === "string" ? currentRecord.status : "developing"),
-        },
-      },
-    },
-  };
 }
 
 function addTrait(state: GameState, trait: string): GameState {
@@ -170,8 +150,70 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
       break;
     case "chat_counter":
       next = changeStats(next, { charm: 2, sensitivity: 1 });
-      next = changeRelationship(next, "studious", 1, "friendly");
+      next = updateRelationship(next, "studious", {
+        scoreDelta: 1,
+        status: "friendly",
+        flags: { trust: Number(getRelationshipFlag(next, "studious", "trust")) + 1 },
+        lastSeenDisposition: "Warmer at the counter, still keeping work boundaries clear.",
+      });
+      next = addSharedMoment(next, "studious", {
+        label: "Counter chat",
+        text: "You lingered at the counter and Mari let the conversation breathe for a minute.",
+        tags: ["coffee_shop", "trust"],
+      });
       next = appendEvent(next, "Chatted with Mari at the coffee shop counter.", ["studious"]);
+      break;
+    case "ask_mari_about_marcus":
+      next = updateRelationship(next, "studious", {
+        scoreDelta: 1,
+        status: "friendly",
+        flags: {
+          trust: Number(getRelationshipFlag(next, "studious", "trust")) + 1,
+          awkward: Number(getRelationshipFlag(next, "studious", "awkward")) + 1,
+        },
+        lastSeenDisposition: "Amused, cautious, and more aware of the triangle forming.",
+      });
+      next = addSharedMomentForMany(next, ["studious", "roommate"], {
+        label: "Asked about Marcus",
+        text: "You asked Mari how she knows Marcus; the answer was careful enough to matter.",
+        tags: ["mari", "marcus", "chemistry"],
+      });
+      next = appendEvent(next, "Asked Mari how she knows Marcus.", ["studious"]);
+      break;
+    case "ask_marcus_about_mari":
+      next = updateRelationship(next, "roommate", {
+        scoreDelta: 1,
+        status: "old friend",
+        flags: {
+          trust: Number(getRelationshipFlag(next, "roommate", "trust")) + 1,
+          awkward: Number(getRelationshipFlag(next, "roommate", "awkward")) + 1,
+        },
+        lastSeenDisposition: "Trying to stay casual while checking what you noticed.",
+      });
+      next = addSharedMomentForMany(next, ["roommate", "studious"], {
+        label: "Asked about Mari",
+        text: "You asked Marcus about Mari and caught him choosing his words more carefully than usual.",
+        tags: ["mari", "marcus", "chemistry"],
+      });
+      next = appendEvent(next, "Asked Marcus about Mari back at the dorm.", ["roommate"]);
+      break;
+    case "suggest_after_shift":
+      next = updateRelationship(next, "studious", {
+        scoreDelta: 2,
+        status: "maybe plans",
+        flags: {
+          trust: Number(getRelationshipFlag(next, "studious", "trust")) + 1,
+          date_planned: true,
+        },
+        lastSeenDisposition: "Interested, but still measuring whether you understand her boundaries.",
+      });
+      next = addSharedMoment(next, "studious", {
+        label: "After-shift idea",
+        text: "You suggested coffee after her shift; Mari did not say yes lightly, but she did not close the door.",
+        tags: ["date_planned", "coffee_shop"],
+      });
+      next = appendEvent(next, "Suggested meeting Mari after her shift.", ["studious"]);
+      notification = { app: "Roster", body: "Mari has a new relationship moment." };
       break;
     case "look_around_location":
       next = changeStats(next, { sensitivity: 1 });
@@ -209,6 +251,9 @@ function getChoiceDurationChunks(choice: Choice) {
     tidy_room: 4,
     sit_window: 6,
     chat_counter: 3,
+    ask_mari_about_marcus: 3,
+    ask_marcus_about_mari: 4,
+    suggest_after_shift: 2,
     bulletin_study_group: 1,
     bulletin_club_fair: 1,
     bulletin_job_lead: 1,
@@ -257,14 +302,18 @@ export function applyChoice(state: GameState, choice: Choice): GameUpdate {
       ...next,
       metMari: true,
       npcsKnown: next.npcsKnown.includes("studious") ? next.npcsKnown : [...next.npcsKnown, "studious"],
-      player: {
-        ...next.player,
-        relationships: {
-          ...(next.player.relationships || {}),
-          studious: { score: 1, status: "met", lastSeenDisposition: "Professionally warm and curious." },
-        },
-      },
     };
+    next = updateRelationship(next, "studious", {
+      scoreDelta: 1,
+      status: "met",
+      flags: { trust: 1, awkward: 0, texting: false, date_planned: false },
+      lastSeenDisposition: "Professionally warm and curious.",
+    });
+    next = addSharedMoment(next, "studious", {
+      label: "First order",
+      text: "You met Mari at the coffee shop counter and she clocked you as Marcus's new roommate.",
+      tags: ["first_meeting", "coffee_shop"],
+    });
     notification = { app: "Pulse", body: "Mari saved your number." };
   }
 
@@ -322,7 +371,23 @@ export function sendPulseMessage(state: GameState, npcId: NpcId, templateId: key
     `Texted ${npc?.name || npcId}: ${text}`,
     [npcId],
   );
-  next = changeRelationship(next, npcId, templateId === "invite_coffee" ? 2 : 1, "texting");
+  next = updateRelationship(next, npcId, {
+    scoreDelta: templateId === "invite_coffee" ? 2 : 1,
+    status: "texting",
+    flags: {
+      texting: true,
+      trust: Number(getRelationshipFlag(next, npcId, "trust")) + 1,
+      ...(templateId === "invite_coffee" ? { date_planned: true } : {}),
+    },
+    lastSeenDisposition: templateId === "invite_coffee" ? "Considering a plan outside the default routine." : "Responsive over text.",
+  });
+  next = addSharedMoment(next, npcId, {
+    label: templateId === "invite_coffee" ? "Coffee invite" : "Text thread",
+    text: templateId === "invite_coffee"
+      ? `You asked ${npc?.name || npcId} about getting coffee sometime this week.`
+      : `You kept the thread with ${npc?.name || npcId} alive without making it a performance.`,
+    tags: ["texting", ...(templateId === "invite_coffee" ? ["date_planned"] : [])],
+  });
   const chemistryUpdate = updateRoommateStudiousChemistry(next, { kind: "pulse", npcId, templateId });
 
   return {

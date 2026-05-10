@@ -12,8 +12,16 @@ export function DialogueStrip({ scene, onChoice, busy = false }: DialogueStripPr
       <div className="dialogue-strip__text">{scene.narration}</div>
       <div className="choice-row">
         {scene.choices.map(choice => (
-          <button className="choice-button" type="button" key={choice.id} onClick={() => onChoice(choice)} disabled={busy}>
-            {choice.label}
+          <button
+            className="choice-button"
+            type="button"
+            key={choice.id}
+            onClick={() => onChoice(choice)}
+            disabled={busy || Boolean(choice.disabledReason)}
+            title={choice.disabledReason}
+          >
+            <span>{choice.label}</span>
+            {choice.disabledReason && <small>{choice.disabledReason}</small>}
           </button>
         ))}
         {busy && <span className="choice-row__status">Generating...</span>}
