@@ -9,7 +9,7 @@ import { applyNarratorStatePatch } from "./narrator/patch";
 import { requestNarratorScene, type NarratorProviderConfig, type NarratorRunResult } from "./narrator/client";
 import { validateGeneratedScene } from "./narrator/validation";
 import { clearState, loadState, saveState } from "./services/storage";
-import type { AcademicTestResult, Choice, GameState, LocationId, NarratorSettings, Scene, WorldPack } from "./types/game";
+import type { AcademicAnswerValue, AcademicTestResult, Choice, GameState, LocationId, NarratorSettings, Scene, WorldPack } from "./types/game";
 import { CompassApp } from "./ui/apps/CompassApp";
 import { AnthropApp } from "./ui/apps/AnthropApp";
 import { BuzzApp } from "./ui/apps/BuzzApp";
@@ -242,7 +242,7 @@ export default function App() {
     return result.summary;
   }, [showNotification, state]);
 
-  const handleSubmitAcademicTest = useCallback((testId: string, answers: Record<string, string>): AcademicTestResult | null => {
+  const handleSubmitAcademicTest = useCallback((testId: string, answers: Record<string, AcademicAnswerValue>): AcademicTestResult | null => {
     if (!state) return null;
     const update = submitAcademicTest(state, testId, answers);
     setState(update.state);

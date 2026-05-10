@@ -33,6 +33,7 @@ export function makeFreshState(): GameState {
     academics: {
       prep: {},
       completedTests: {},
+      courses: {},
     },
     calendar: {
       seenReminderIds: [],
@@ -80,6 +81,7 @@ export function normalizeState(state: GameState): GameState {
     academics: {
       prep: state.academics?.prep || {},
       completedTests: state.academics?.completedTests || {},
+      courses: state.academics?.courses || {},
     },
     calendar: {
       seenReminderIds: state.calendar?.seenReminderIds || [],

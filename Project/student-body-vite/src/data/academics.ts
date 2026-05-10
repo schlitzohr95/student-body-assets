@@ -1,4 +1,20 @@
-import type { AcademicTestDefinition } from "../types/game";
+import type { AcademicCourseDefinition, AcademicTestDefinition } from "../types/game";
+import { timeChunk } from "./locations";
+
+export const DEFAULT_COURSE_ID = "soc101";
+
+export const ACADEMIC_COURSES: AcademicCourseDefinition[] = [
+  {
+    id: "soc101",
+    code: "SOC 101",
+    title: "Intro Sociology",
+    instructor: "Dr. Imani Hale",
+    location: "lecture_hall",
+    meetingDays: [1, 3, 8, 10, 15, 17, 22, 24],
+    summary: "Methods, norms, belonging, and how ordinary campus life becomes evidence.",
+    stakes: "Grades are only part of it. Strong work can open office-hour leads, social reads, and research opportunities.",
+  },
+];
 
 export const ACADEMIC_TESTS: AcademicTestDefinition[] = [
   {
@@ -7,11 +23,15 @@ export const ACADEMIC_TESTS: AcademicTestDefinition[] = [
     courseTitle: "Intro Sociology",
     label: "Diagnostic Quiz",
     day: 7,
+    startSlot: timeChunk(10),
+    endSlot: timeChunk(11),
     location: "lecture_hall",
     baseDifficulty: 6,
+    minQuestions: 4,
     questions: [
       {
         id: "norms_vs_laws",
+        type: "multiple_choice",
         prompt: "A student cuts through the dining hall line. Nobody calls campus security, but everyone nearby reacts. Which concept best explains what was violated?",
         hint: "The reaction is social before it is formal.",
         skill: "knowledge",
@@ -19,38 +39,52 @@ export const ACADEMIC_TESTS: AcademicTestDefinition[] = [
           { id: "law", label: "A formal law" },
           { id: "norm", label: "An informal norm", correct: true },
           { id: "sanction", label: "A legal sanction" },
-          { id: "sample", label: "A representative sample" }
+          { id: "sample", label: "A representative sample" },
         ],
-        explanation: "Norms are shared expectations. They can be enforced socially even when no formal rule is invoked."
+        explanation: "Norms are shared expectations. They can be enforced socially even when no formal rule is invoked.",
       },
       {
-        id: "operationalize",
-        prompt: "Dr. Hale asks the class to turn 'campus belonging' into something observable. What is she asking students to do?",
-        hint: "She wants a fuzzy idea turned into measurable evidence.",
+        id: "operationalize_short",
+        type: "short_text",
+        prompt: "Dr. Hale asks the class to turn 'campus belonging' into something observable. Type the method word she is asking for.",
+        hint: "The answer starts with 'oper-' and means making an abstract concept measurable.",
         skill: "knowledge",
-        options: [
-          { id: "operationalize", label: "Operationalize the concept", correct: true },
-          { id: "generalize", label: "Generalize from a sample" },
-          { id: "sanction", label: "Apply a sanction" },
-          { id: "stratify", label: "Stratify the population" }
-        ],
-        explanation: "Operationalizing means defining how an abstract concept will be observed or measured."
+        correctAnswers: ["operationalize", "operationalization", "operationalise", "operationalisation"],
+        explanation: "Operationalizing means defining how an abstract concept will be observed or measured.",
       },
       {
-        id: "correlation",
-        prompt: "A survey finds students who attend club meetings report higher belonging. What is the safest claim?",
-        hint: "Do not overclaim cause from a relationship.",
+        id: "correlation_claims",
+        type: "multi_select",
+        prompt: "A survey finds students who attend club meetings report higher belonging. Select every claim that stays within the evidence.",
+        hint: "Keep association. Avoid definite causation.",
         skill: "grit",
         options: [
-          { id: "cause", label: "Clubs definitely cause belonging" },
-          { id: "reverse", label: "Belonging definitely causes club attendance" },
           { id: "association", label: "Club attendance is associated with belonging", correct: true },
-          { id: "invalid", label: "The survey proves nothing can be learned" }
+          { id: "needs_design", label: "A stronger design would be needed to prove causation", correct: true },
+          { id: "cause", label: "Clubs definitely cause belonging" },
+          { id: "nothing", label: "The survey proves nothing can be learned" },
         ],
-        explanation: "A correlation supports an association, but causation needs stronger design or evidence."
+        correctAnswers: ["association", "needs_design"],
+        explanation: "A correlation supports an association, but causation needs stronger design or evidence.",
+      },
+      {
+        id: "research_order",
+        type: "order",
+        prompt: "Put the basic research flow in order.",
+        hint: "Start with the idea, then make it measurable, then gather evidence.",
+        skill: "grit",
+        options: [
+          { id: "collect", label: "Collect observations" },
+          { id: "concept", label: "Define the concept" },
+          { id: "interpret", label: "Interpret patterns" },
+          { id: "measure", label: "Choose observable measures" },
+        ],
+        correctAnswers: ["concept", "measure", "collect", "interpret"],
+        explanation: "A clean project moves from concept to measurement to observation to interpretation.",
       },
       {
         id: "ethnography",
+        type: "multiple_choice",
         prompt: "A researcher spends evenings in the student union taking field notes about how groups form and split. Which method is this closest to?",
         hint: "Think observation in a natural setting.",
         skill: "sensitivity",
@@ -58,11 +92,11 @@ export const ACADEMIC_TESTS: AcademicTestDefinition[] = [
           { id: "experiment", label: "Laboratory experiment" },
           { id: "ethnography", label: "Ethnographic observation", correct: true },
           { id: "census", label: "Census enumeration" },
-          { id: "regression", label: "Regression modeling" }
+          { id: "regression", label: "Regression modeling" },
         ],
-        explanation: "Ethnography uses close observation and field notes to understand social life in context."
-      }
-    ]
+        explanation: "Ethnography uses close observation and field notes to understand social life in context.",
+      },
+    ],
   },
   {
     id: "soc101_methods_midterm",
@@ -70,11 +104,15 @@ export const ACADEMIC_TESTS: AcademicTestDefinition[] = [
     courseTitle: "Intro Sociology",
     label: "Methods Midterm",
     day: 14,
+    startSlot: timeChunk(10),
+    endSlot: timeChunk(11, 15),
     location: "lecture_hall",
     baseDifficulty: 8,
+    minQuestions: 4,
     questions: [
       {
         id: "sampling_bias",
+        type: "multiple_choice",
         prompt: "A campus survey only includes students who already visit the library. What is the strongest concern?",
         hint: "Who is missing from the data?",
         skill: "knowledge",
@@ -82,25 +120,22 @@ export const ACADEMIC_TESTS: AcademicTestDefinition[] = [
           { id: "bias", label: "Sampling bias", correct: true },
           { id: "ethics", label: "Informed consent is impossible" },
           { id: "causal", label: "Too many causal variables" },
-          { id: "none", label: "There is no concern" }
+          { id: "none", label: "There is no concern" },
         ],
-        explanation: "Sampling only library visitors likely excludes students with different habits and experiences."
+        explanation: "Sampling only library visitors likely excludes students with different habits and experiences.",
       },
       {
-        id: "confidentiality",
-        prompt: "A student interview includes sensitive family details. What should the researcher prioritize when writing field notes?",
+        id: "confidentiality_short",
+        type: "short_text",
+        prompt: "A student interview includes sensitive family details. Type the key ethics priority for the field notes.",
         hint: "Protect the person, not just the data file.",
         skill: "sensitivity",
-        options: [
-          { id: "names", label: "Use full names so the data is vivid" },
-          { id: "confidentiality", label: "Protect confidentiality", correct: true },
-          { id: "publish", label: "Post the details for peer review" },
-          { id: "ignore", label: "Ignore it because it is qualitative" }
-        ],
-        explanation: "Sensitive qualitative data still requires confidentiality and careful handling."
+        correctAnswers: ["confidentiality", "privacy", "anonymity", "protect confidentiality"],
+        explanation: "Sensitive qualitative data still requires confidentiality and careful handling.",
       },
       {
         id: "variable",
+        type: "multiple_choice",
         prompt: "In a study of sleep and test performance, 'hours slept' is being used as what?",
         hint: "It is the measured factor that may vary.",
         skill: "knowledge",
@@ -108,12 +143,40 @@ export const ACADEMIC_TESTS: AcademicTestDefinition[] = [
           { id: "variable", label: "A variable", correct: true },
           { id: "norm", label: "A norm" },
           { id: "sanction", label: "A sanction" },
-          { id: "ethic", label: "An ethical review" }
+          { id: "ethic", label: "An ethical review" },
         ],
-        explanation: "A variable is something measured that can take different values."
-      }
-    ]
-  }
+        explanation: "A variable is something measured that can take different values.",
+      },
+      {
+        id: "ethics_safeguards",
+        type: "multi_select",
+        prompt: "Select the safeguards that fit an interview study with sensitive details.",
+        hint: "Think consent and identity protection.",
+        skill: "sensitivity",
+        options: [
+          { id: "consent", label: "Get informed consent", correct: true },
+          { id: "pseudonyms", label: "Use pseudonyms or remove identifiers", correct: true },
+          { id: "post_raw", label: "Post raw notes for transparency" },
+          { id: "pressure", label: "Pressure hesitant participants to continue" },
+        ],
+        correctAnswers: ["consent", "pseudonyms"],
+        explanation: "Consent and identity protection are basic safeguards; raw exposure and pressure are ethical failures.",
+      },
+      {
+        id: "methods_order",
+        type: "order",
+        prompt: "Put the interview workflow in the safest order.",
+        hint: "Consent comes before questions; anonymizing happens before analysis leaves your notes.",
+        skill: "grit",
+        options: [
+          { id: "anonymize", label: "Remove identifying details" },
+          { id: "analyze", label: "Analyze themes" },
+          { id: "consent", label: "Get consent" },
+          { id: "interview", label: "Conduct interview" },
+        ],
+        correctAnswers: ["consent", "interview", "anonymize", "analyze"],
+        explanation: "A safe qualitative workflow gets consent, conducts the interview, protects identity, then analyzes themes.",
+      },
+    ],
+  },
 ];
-
-export const DEFAULT_COURSE_ID = "soc101";

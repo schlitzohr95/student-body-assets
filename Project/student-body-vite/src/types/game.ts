@@ -92,6 +92,9 @@ export interface ChemistryRecord {
   lastUpdatedSlot?: number;
 }
 
+export type AcademicQuestionType = "multiple_choice" | "multi_select" | "order" | "short_text";
+export type AcademicAnswerValue = string | string[];
+
 export interface AcademicAnswerOption {
   id: string;
   label: string;
@@ -100,11 +103,24 @@ export interface AcademicAnswerOption {
 
 export interface AcademicQuestion {
   id: string;
+  type?: AcademicQuestionType;
   prompt: string;
-  options: AcademicAnswerOption[];
+  options?: AcademicAnswerOption[];
+  correctAnswers?: string[];
   explanation: string;
   hint?: string;
   skill?: StatKey;
+}
+
+export interface AcademicCourseDefinition {
+  id: string;
+  code: string;
+  title: string;
+  instructor: string;
+  location: LocationId;
+  meetingDays: number[];
+  summary: string;
+  stakes: string;
 }
 
 export interface AcademicTestDefinition {
@@ -113,24 +129,40 @@ export interface AcademicTestDefinition {
   courseTitle: string;
   label: string;
   day: number;
+  startSlot?: TimeSlotIndex;
+  endSlot?: TimeSlotIndex;
   location: LocationId;
   baseDifficulty: number;
+  minQuestions?: number;
   questions: AcademicQuestion[];
+}
+
+export interface AcademicStudyEntry {
+  day: number;
+  slot: TimeSlotIndex;
+  studyChunks: number;
+  reviewChunks: number;
+  focus: number;
 }
 
 export interface AcademicPrepRecord {
   studyChunks: number;
   reviewChunks: number;
   focus: number;
+  history?: AcademicStudyEntry[];
   lastStudiedDay?: number;
   lastStudiedSlot?: number;
 }
 
 export interface AcademicTestAnswer {
   questionId: string;
-  answerId: string;
+  answerId?: string;
+  answerIds?: string[];
+  value?: AcademicAnswerValue;
   correct: boolean;
 }
+
+export type AcademicTestOutcome = "failed" | "partial" | "passed" | "high";
 
 export interface AcademicTestResult {
   testId: string;
@@ -142,14 +174,31 @@ export interface AcademicTestResult {
   threshold: number;
   passed: boolean;
   grade: string;
+  outcome: AcademicTestOutcome;
+  percentage: number;
   prepScore: number;
   difficulty: number;
+  curveBonus: number;
+  courseStanding: number;
+  consequences: string[];
   answers: AcademicTestAnswer[];
+}
+
+export interface AcademicCourseRecord {
+  courseId: string;
+  standing: number;
+  highScores: number;
+  passes: number;
+  partials: number;
+  failures: number;
+  lastGrade?: string;
+  flags?: string[];
 }
 
 export interface AcademicsState {
   prep: Record<string, AcademicPrepRecord>;
   completedTests: Record<string, AcademicTestResult>;
+  courses?: Record<string, AcademicCourseRecord>;
 }
 
 export interface CalendarEvent {

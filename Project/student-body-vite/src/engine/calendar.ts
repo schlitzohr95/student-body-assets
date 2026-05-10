@@ -1,10 +1,11 @@
 import { BASE_CALENDAR_EVENTS, academicTestCalendarEvents } from "../data/calendar";
-import { DAY_LABELS, LOCATIONS, TIME_CHUNK_MINUTES, formatClockTime, normalizeTimeSlot, timeChunk } from "../data/locations";
+import { DAY_LABELS, LOCATIONS, formatClockTime, normalizeTimeSlot, timeChunk } from "../data/locations";
 import { STARTER_NPCS } from "../data/npcs";
 import type { CalendarEvent, GameState, GameUpdate, LocationDefinition, Npc, NpcId, NpcScheduleBlock } from "../types/game";
 import { normalizeLocationMap, normalizeNpcMap } from "./worldPacks";
 
 const REMINDER_WINDOW_CHUNKS = 16;
+const CHUNKS_PER_DAY_FOR_CALENDAR = 96;
 
 const STATIC_NPC_SCHEDULES: Record<NpcId, Record<string, NpcScheduleBlock[]>> = {
   studious: {
@@ -37,6 +38,10 @@ function dayName(day: number) {
 function dayGroup(day: number) {
   const name = dayName(day);
   return name === "saturday" || name === "sunday" ? "weekend" : "weekday";
+}
+
+function absoluteSlot(day: number, slot: number) {
+  return (day - 1) * CHUNKS_PER_DAY_FOR_CALENDAR + slot;
 }
 
 export function parseScheduleSlot(value: string | number | undefined, fallback = 0) {
@@ -184,10 +189,10 @@ export function getCalendarEvents(state: GameState): CalendarEvent[] {
 }
 
 export function getUpcomingCalendarEvents(state: GameState, windowChunks = 96): CalendarEvent[] {
-  const now = (state.day - 1) * 96 + state.timeSlot;
+  const now = absoluteSlot(state.day, state.timeSlot);
   return getCalendarEvents(state)
     .filter(event => {
-      const when = (event.day - 1) * 96 + event.startSlot;
+      const when = absoluteSlot(event.day, event.startSlot);
       return when >= now && when <= now + windowChunks;
     })
     .slice(0, 6);
@@ -201,11 +206,19 @@ export function formatCalendarEventTime(event: CalendarEvent) {
 }
 
 export function maybeIssueCalendarReminder(state: GameState): GameUpdate {
-  const upcoming = getUpcomingCalendarEvents(state, REMINDER_WINDOW_CHUNKS)
+  const now = absoluteSlot(state.day, state.timeSlot);
+  const active = getCalendarEvents(state)
+    .find(event => {
+      if (event.kind !== "test" && event.kind !== "class") return false;
+      const start = absoluteSlot(event.day, event.startSlot);
+      const end = absoluteSlot(event.day, event.endSlot ?? event.startSlot + 4);
+      return now >= start && now < end;
+    });
+  const upcoming = active || getUpcomingCalendarEvents(state, REMINDER_WINDOW_CHUNKS)
     .find(event => event.kind === "test" || event.kind === "deadline" || event.kind === "class");
   if (!upcoming) return { state };
 
-  const reminderId = eventKey(upcoming);
+  const reminderId = `${active ? "active" : "upcoming"}:${eventKey(upcoming)}`;
   const seen = state.calendar?.seenReminderIds || [];
   if (seen.includes(reminderId)) return { state };
 
@@ -218,7 +231,7 @@ export function maybeIssueCalendarReminder(state: GameState): GameUpdate {
     },
     notification: {
       app: upcoming.kind === "test" ? "Spark" : "Anthrop",
-      body: `${upcoming.title} at ${formatClockTime(upcoming.startSlot)}.`,
+      body: active ? `${upcoming.title} starts now.` : `${upcoming.title} at ${formatClockTime(upcoming.startSlot)}.`,
     },
   };
 }

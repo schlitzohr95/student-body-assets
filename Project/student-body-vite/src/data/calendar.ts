@@ -47,12 +47,12 @@ export function academicTestCalendarEvents(): CalendarEvent[] {
     title: `${test.courseTitle}: ${test.label}`,
     kind: "test",
     day: test.day,
-    startSlot: timeChunk(10),
-    endSlot: timeChunk(11),
+    startSlot: test.startSlot ?? timeChunk(10),
+    endSlot: test.endSlot ?? timeChunk(11),
     location: test.location,
     courseId: test.courseId,
     testId: test.id,
     source: "academics",
-    description: `Academic test. Prep affects difficulty and hints.`,
+    description: `Academic test. Prep affects hints, question count, difficulty, and grade curve.`,
   }));
 }
