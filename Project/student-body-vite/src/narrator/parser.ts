@@ -11,7 +11,7 @@ export function choiceIdFromLabel(label: string): string {
 }
 
 function parseNarratorChoiceLine(line: string, index: number): Choice | null {
-  const cleaned = line.trim().replace(/^\d+[\).]\s*/, "");
+  const cleaned = line.trim().replace(/^\d+[\).]\s*/, "").replace(/^[-*]\s*/, "");
   if (!cleaned) return null;
 
   if (cleaned.includes("|")) {
@@ -23,15 +23,29 @@ function parseNarratorChoiceLine(line: string, index: number): Choice | null {
   return { id: choiceIdFromLabel(cleaned) || `choice_${index + 1}`, label: cleaned };
 }
 
+function normalizeNarratorMarkers(text: string): string {
+  return text
+    .replace(/\*\*\s*\[(CHOICES|OPEN|STATE|\/CHOICES|\/STATE)\]\s*\*\*/gi, "[$1]")
+    .replace(/__\s*\[(CHOICES|OPEN|STATE|\/CHOICES|\/STATE)\]\s*__/gi, "[$1]");
+}
+
+function cleanStateJson(rawJson: string): string {
+  return rawJson
+    .trim()
+    .replace(/^```(?:json|js|javascript)?\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+}
+
 export function parseNarratorResponse(text: string): NarratorParsedResponse {
-  const rawText = String(text || "").trim();
+  const rawText = normalizeNarratorMarkers(String(text || "").trim());
   const stateMatch = rawText.match(/\[STATE\]\s*([\s\S]*?)(?:\[\/STATE\]|$)/);
   let statePatch: Record<string, unknown> | null = null;
   let stateParseError: unknown | null = null;
 
   if (stateMatch) {
     try {
-      statePatch = JSON.parse(stateMatch[1].trim()) as Record<string, unknown>;
+      statePatch = JSON.parse(cleanStateJson(stateMatch[1])) as Record<string, unknown>;
     } catch (error) {
       stateParseError = error;
     }

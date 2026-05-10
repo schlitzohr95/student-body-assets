@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite --host 127.0.0.1",
+    "narrator:proxy": "node scripts/narrator-proxy.mjs",
+    "narrator:bench": "node scripts/narrator-bench.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview --host 127.0.0.1"
   },

@@ -44,6 +44,12 @@ export interface NarratorRequestOptions {
   systemPrompt?: string;
 }
 
+export interface NarratorContextRequestInput {
+  context: string;
+  action: string;
+  stateSummary: NarratorProviderRequest["stateSummary"];
+}
+
 declare global {
   interface Window {
     studentBodyNarrator?: {
@@ -171,23 +177,32 @@ export async function requestNarratorScene(
   action: NarratorAction,
   options: NarratorRequestOptions = {},
 ): Promise<NarratorRunResult> {
-  const provider = options.provider || DEFAULT_PROVIDER;
   const actionText = actionToText(action);
-  const context = buildNarratorContext(state, actionText);
-  const request: NarratorProviderRequest = {
-    system: options.systemPrompt || NARRATOR_SYSTEM_PROMPT,
-    messages: [{ role: "user", content: context }],
-    context,
+  return requestNarratorContext({
+    context: buildNarratorContext(state, actionText),
     action: actionText,
-    model: provider.model,
     stateSummary: {
       day: state.day,
       timeSlot: state.timeSlot,
       location: state.location,
       presentNpcIds: presentNpcIds(state),
     },
-  };
+  }, options);
+}
 
+export async function requestNarratorContext(
+  input: NarratorContextRequestInput,
+  options: NarratorRequestOptions = {},
+): Promise<NarratorRunResult> {
+  const provider = options.provider || DEFAULT_PROVIDER;
+  const request: NarratorProviderRequest = {
+    system: options.systemPrompt || NARRATOR_SYSTEM_PROMPT,
+    messages: [{ role: "user", content: input.context }],
+    context: input.context,
+    action: input.action,
+    model: provider.model,
+    stateSummary: input.stateSummary,
+  };
   const started = performance.now();
   let rawText = "";
 
@@ -198,7 +213,7 @@ export async function requestNarratorScene(
   return {
     provider,
     request,
-    context,
+    context: input.context,
     rawText,
     parsed: parseNarratorResponse(rawText),
     latencyMs: Math.round(performance.now() - started),

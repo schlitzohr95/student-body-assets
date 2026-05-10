@@ -49,6 +49,8 @@ This folder is intentionally split as if the project will become a real game, no
 
 Beacon's `NarratorLabApp` is the manual harness for trying one generation at a time. When the full game loop is ready, keep Beacon as a debug surface and call the same narrator functions from the normal choice/action flow.
 
+`scripts/narrator-proxy.mjs` is the development proxy for the `http` provider. It is intentionally outside `src` because it runs in Node, owns provider secrets, and should never be bundled into the React app. It also exposes `GET /models/openrouter/free` for Beacon's free-model dropdown.
+
 ## What Goes Where
 
 New stat mechanics

@@ -686,7 +686,7 @@ button {
 }
 
 .narrator-lab__controls {
-  grid-template-rows: auto auto auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   gap: 10px;
 }
 
@@ -696,7 +696,6 @@ button {
 }
 
 .narrator-lab__header,
-.narrator-lab__actions,
 .segmented-control,
 .narrator-tabs {
   display: flex;
@@ -717,6 +716,25 @@ button {
 .narrator-lab__header span {
   color: #a89878;
   font-size: 11px;
+}
+
+.narrator-lab__control-scroll {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.narrator-lab__actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.narrator-lab__actions button:first-child {
+  grid-column: 1 / -1;
 }
 
 .segmented-control,
@@ -752,13 +770,14 @@ button {
   color: #f0ebdc;
 }
 
-.narrator-lab__actions button {
-  flex: 1;
+.narrator-lab__actions button,
+.secondary-button {
   border: 1px solid rgba(200, 161, 101, 0.28);
   text-transform: none;
 }
 
-.narrator-lab__actions button:disabled {
+.narrator-lab__actions button:disabled,
+.secondary-button:disabled {
   cursor: default;
   opacity: 0.48;
 }
@@ -777,6 +796,7 @@ button {
 }
 
 .field-stack input,
+.field-stack select,
 .field-stack textarea,
 .narrator-text-preview {
   width: 100%;
@@ -787,16 +807,72 @@ button {
   font: 12px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
 }
 
-.field-stack input {
+.field-stack input,
+.field-stack select {
   min-height: 32px;
   padding: 7px 9px;
 }
 
+.field-stack select {
+  appearance: none;
+  background-image: linear-gradient(45deg, transparent 50%, #c8a165 50%), linear-gradient(135deg, #c8a165 50%, transparent 50%);
+  background-position: calc(100% - 14px) 13px, calc(100% - 9px) 13px;
+  background-repeat: no-repeat;
+  background-size: 5px 5px, 5px 5px;
+  padding-right: 26px;
+}
+
 .field-stack textarea {
-  min-height: 0;
-  height: 100%;
+  min-height: 118px;
+  height: 118px;
   resize: none;
   padding: 9px;
+}
+
+.model-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.secondary-button {
+  min-width: 78px;
+  min-height: 32px;
+  border-radius: 6px;
+  background: rgba(200, 161, 101, 0.2);
+  color: #f0ebdc;
+  cursor: pointer;
+  font: 700 11px/1 system-ui, sans-serif;
+}
+
+.model-status {
+  min-height: 0;
+  padding: 6px 8px;
+  border: 1px solid rgba(240, 235, 220, 0.1);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.16);
+  color: #a89878;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.model-status.is-error {
+  color: #ffd7ce;
+}
+
+.bench-focus {
+  margin: 0;
+  color: #a89878;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.bench-action-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
 }
 
 .narrator-text-preview {
@@ -866,6 +942,113 @@ button {
   overflow: auto;
   color: #d8cbb3;
   font: 11px/1.45 ui-monospace, SFMono-Regular, Consolas, "Liberation Mono", monospace;
+}
+
+.bench-panel {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  min-height: 0;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.bench-panel__header,
+.bench-card header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.bench-panel__header h3,
+.bench-panel__header p,
+.bench-card p,
+.bench-card ul {
+  margin: 0;
+}
+
+.bench-panel__header h3 {
+  color: #c8a165;
+  font-size: 13px;
+}
+
+.bench-panel__header p,
+.bench-card p,
+.bench-card small,
+.bench-card li {
+  color: #d8cbb3;
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.bench-panel__header .secondary-button {
+  min-width: 128px;
+}
+
+.bench-card {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid rgba(240, 235, 220, 0.1);
+  border-radius: 8px;
+  background: rgba(240, 235, 220, 0.05);
+}
+
+.bench-card strong {
+  color: #f0ebdc;
+  font-size: 13px;
+}
+
+.bench-score {
+  min-width: 44px;
+  padding: 4px 7px;
+  border-radius: 999px;
+  background: rgba(103, 166, 116, 0.22);
+  color: #cdf1d5;
+  font: 700 11px/1 system-ui, sans-serif;
+  text-align: center;
+}
+
+.bench-score.is-warn {
+  background: rgba(218, 96, 72, 0.16);
+  color: #ffd7ce;
+}
+
+.bench-flag-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.bench-flag {
+  padding: 4px 6px;
+  border: 1px solid rgba(103, 166, 116, 0.3);
+  border-radius: 999px;
+  background: rgba(103, 166, 116, 0.14);
+  color: #cdf1d5;
+  font-size: 10px;
+  line-height: 1;
+}
+
+.bench-flag.is-fail {
+  border-color: rgba(218, 96, 72, 0.32);
+  background: rgba(218, 96, 72, 0.12);
+  color: #ffd7ce;
+}
+
+.bench-card details {
+  color: #d8cbb3;
+  font-size: 12px;
+}
+
+.bench-card summary {
+  cursor: pointer;
+  color: #c8a165;
+}
+
+.bench-card ul {
+  padding: 6px 0 0 18px;
 }
 
 @media (max-width: 760px) {
