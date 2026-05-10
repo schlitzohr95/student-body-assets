@@ -91,6 +91,66 @@ export interface ChemistryRecord {
   lastUpdatedSlot?: number;
 }
 
+export interface AcademicAnswerOption {
+  id: string;
+  label: string;
+  correct?: boolean;
+}
+
+export interface AcademicQuestion {
+  id: string;
+  prompt: string;
+  options: AcademicAnswerOption[];
+  explanation: string;
+  hint?: string;
+  skill?: StatKey;
+}
+
+export interface AcademicTestDefinition {
+  id: string;
+  courseId: string;
+  courseTitle: string;
+  label: string;
+  day: number;
+  location: LocationId;
+  baseDifficulty: number;
+  questions: AcademicQuestion[];
+}
+
+export interface AcademicPrepRecord {
+  studyChunks: number;
+  reviewChunks: number;
+  focus: number;
+  lastStudiedDay?: number;
+  lastStudiedSlot?: number;
+}
+
+export interface AcademicTestAnswer {
+  questionId: string;
+  answerId: string;
+  correct: boolean;
+}
+
+export interface AcademicTestResult {
+  testId: string;
+  courseId: string;
+  day: number;
+  slot: number;
+  correct: number;
+  total: number;
+  threshold: number;
+  passed: boolean;
+  grade: string;
+  prepScore: number;
+  difficulty: number;
+  answers: AcademicTestAnswer[];
+}
+
+export interface AcademicsState {
+  prep: Record<string, AcademicPrepRecord>;
+  completedTests: Record<string, AcademicTestResult>;
+}
+
 export interface NpcSchema {
   ageBand?: string;
   publicFace?: string;
@@ -200,6 +260,7 @@ export interface GameState {
   messages: GameMessage[];
   notes: GameNote[];
   chemistry?: Record<string, ChemistryRecord>;
+  academics?: AcademicsState;
   narrator?: NarratorSettings;
   npcDirectory?: Record<NpcId, Npc>;
   npcMoods?: Record<NpcId, string>;

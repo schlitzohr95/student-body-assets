@@ -3,6 +3,7 @@ import { DEFAULT_ACTION_CHUNKS, formatDuration, LOCATIONS } from "../data/locati
 import { STARTER_NPCS } from "../data/npcs";
 import { advanceTime, appendEvent } from "./state";
 import { updateRoommateStudiousChemistry } from "./chemistry";
+import { addAcademicPrep } from "./academics";
 
 const messageResponses: Record<string, string> = {
   check_in: "Hey. Still alive over there?",
@@ -63,10 +64,12 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
   switch (choice.id) {
     case "study_deep":
       next = changeResources(changeStats(next, { knowledge: 4, grit: 1 }), { energy: -8 });
+      next = addAcademicPrep(next, "soc101", { studyChunks: 6, focus: 3 });
       next = appendEvent(next, "Studied seriously at the library.");
       break;
     case "browse_stacks":
       next = changeStats(next, { knowledge: 2, sensitivity: 1 });
+      next = addAcademicPrep(next, "soc101", { studyChunks: 2, focus: 1 });
       next = appendEvent(next, "Wandered the library stacks and found a few promising books.");
       break;
     case "workout_weights":
@@ -112,6 +115,7 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
       break;
     case "review_notes":
       next = changeResources(changeStats(next, { knowledge: 3, grit: 1 }), { energy: -5 });
+      next = addAcademicPrep(next, "soc101", { reviewChunks: 5, focus: 2 });
       next = appendEvent(next, "Reviewed class notes in the dorm room.");
       break;
     case "tidy_room":
@@ -120,6 +124,7 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
       break;
     case "sit_window":
       next = changeResources(changeStats(next, { knowledge: 2 }), { energy: 2, money: -3 });
+      next = addAcademicPrep(next, "soc101", { studyChunks: 3, focus: 1 });
       next = appendEvent(next, "Studied for a while in the coffee shop window booth.");
       break;
     case "chat_counter":

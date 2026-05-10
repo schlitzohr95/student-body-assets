@@ -4,11 +4,12 @@ import { getScriptedScene } from "./engine/scriptedScenes";
 import { makeFreshState, normalizeState } from "./engine/state";
 import { addMarginNote, applyChoice, navigateToLocation, sendPulseMessage } from "./engine/transitions";
 import { applyWorldPack } from "./engine/worldPacks";
+import { submitAcademicTest } from "./engine/academics";
 import { applyNarratorStatePatch } from "./narrator/patch";
 import { requestNarratorScene, type NarratorProviderConfig, type NarratorRunResult } from "./narrator/client";
 import { validateGeneratedScene } from "./narrator/validation";
 import { clearState, loadState, saveState } from "./services/storage";
-import type { Choice, GameState, LocationId, NarratorSettings, Scene, WorldPack } from "./types/game";
+import type { AcademicTestResult, Choice, GameState, LocationId, NarratorSettings, Scene, WorldPack } from "./types/game";
 import { CompassApp } from "./ui/apps/CompassApp";
 import { AnthropApp } from "./ui/apps/AnthropApp";
 import { BuzzApp } from "./ui/apps/BuzzApp";
@@ -17,6 +18,7 @@ import { NarratorLabApp } from "./ui/apps/NarratorLabApp";
 import { PulseApp } from "./ui/apps/PulseApp";
 import { RosterApp } from "./ui/apps/RosterApp";
 import { SelfApp } from "./ui/apps/SelfApp";
+import { SparkApp } from "./ui/apps/SparkApp";
 import { StubApp } from "./ui/apps/StubApp";
 import { DialogueStrip } from "./ui/components/DialogueStrip";
 import { FloatingControls } from "./ui/components/FloatingControls";
@@ -230,6 +232,14 @@ export default function App() {
     return result.summary;
   }, [showNotification, state]);
 
+  const handleSubmitAcademicTest = useCallback((testId: string, answers: Record<string, string>): AcademicTestResult | null => {
+    if (!state) return null;
+    const update = submitAcademicTest(state, testId, answers);
+    setState(update.state);
+    if (update.notification) showNotification(update.notification);
+    return update.result || null;
+  }, [showNotification, state]);
+
   if (!loaded || !state) {
     return <main className="loading-screen">Loading...</main>;
   }
@@ -249,6 +259,7 @@ export default function App() {
     else if (appId === "self") phoneContent = <SelfApp state={state} />;
     else if (appId === "buzz") phoneContent = <BuzzApp state={state} />;
     else if (appId === "anthrop") phoneContent = <AnthropApp state={state} />;
+    else if (appId === "spark") phoneContent = <SparkApp state={state} onSubmitTest={handleSubmitAcademicTest} />;
     else if (appId === "margin") phoneContent = <MarginApp state={state} onAddNote={handleAddNote} />;
     else if (appId === "beacon") {
       phoneContent = (

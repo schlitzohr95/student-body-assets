@@ -7,7 +7,7 @@ export const APPS: PhoneAppDefinition[] = [
   { id: "self", label: "Self", role: "Stats", layout: "portrait", implemented: true },
   { id: "buzz", label: "Buzz", role: "Campus feed", layout: "landscape", implemented: true },
   { id: "anthrop", label: "Anthrop", role: "Assistant", layout: "landscape", implemented: true },
-  { id: "spark", label: "Spark", role: "Dating", layout: "landscape", implemented: false },
+  { id: "spark", label: "Spark", role: "Academics", layout: "landscape", implemented: true },
   { id: "margin", label: "Margin", role: "Notes", layout: "portrait", implemented: true },
   { id: "lens", label: "Lens", role: "Camera", layout: "landscape", implemented: false },
   { id: "wake", label: "Wake", role: "Alarm", layout: "portrait", implemented: false },

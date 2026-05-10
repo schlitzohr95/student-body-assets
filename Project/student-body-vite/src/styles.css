@@ -827,6 +827,225 @@ button {
   color: #c8a165;
 }
 
+.spark-app {
+  height: 100%;
+  display: grid;
+  grid-template-columns: minmax(230px, 0.75fr) minmax(0, 1.35fr);
+  gap: 14px;
+  padding: 14px;
+  overflow: hidden;
+  background: #171a16;
+  color: #f0ebdc;
+  font-family: system-ui, sans-serif;
+}
+
+.spark-sidebar,
+.spark-test-panel {
+  display: grid;
+  min-height: 0;
+  gap: 10px;
+  overflow: hidden;
+}
+
+.spark-sidebar {
+  align-content: start;
+}
+
+.spark-sidebar header {
+  display: grid;
+  gap: 3px;
+}
+
+.spark-sidebar header strong {
+  color: #f0ebdc;
+  font-size: 15px;
+}
+
+.spark-test-list,
+.spark-question-list,
+.spark-option-list {
+  display: grid;
+  gap: 8px;
+  min-height: 0;
+}
+
+.spark-test-list,
+.spark-question-list {
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.spark-test-button,
+.spark-option,
+.spark-submit {
+  border: 1px solid rgba(240, 235, 220, 0.12);
+  border-radius: 6px;
+  background: rgba(240, 235, 220, 0.05);
+  color: #f0ebdc;
+}
+
+.spark-test-button {
+  display: grid;
+  gap: 3px;
+  padding: 9px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.spark-test-button.is-selected,
+.spark-option.is-selected {
+  border-color: rgba(126, 181, 135, 0.45);
+  background: rgba(126, 181, 135, 0.16);
+}
+
+.spark-test-button span,
+.spark-test-button small,
+.spark-note,
+.spark-test-header p,
+.spark-question em,
+.spark-explanation {
+  color: #b8c9ae;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.spark-test-button strong {
+  font-size: 13px;
+}
+
+.spark-prep-panel {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px 10px;
+  padding: 10px;
+  border: 1px solid rgba(126, 181, 135, 0.22);
+  border-radius: 6px;
+  background: rgba(126, 181, 135, 0.08);
+}
+
+.spark-prep-panel span {
+  color: #b8c9ae;
+  font-size: 12px;
+}
+
+.spark-prep-panel strong,
+.spark-status,
+.spark-question header span {
+  color: #9fd2a9;
+}
+
+.spark-note,
+.spark-test-header p,
+.spark-question p {
+  margin: 0;
+}
+
+.spark-test-panel {
+  grid-template-rows: auto auto auto minmax(0, 1fr) auto;
+}
+
+.spark-test-header,
+.spark-question header {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.spark-test-header h2 {
+  margin: 0 0 4px;
+  color: #f0ebdc;
+  font-size: 17px;
+  letter-spacing: 0;
+  text-transform: none;
+}
+
+.spark-status {
+  align-self: start;
+  min-width: 76px;
+  padding: 5px 7px;
+  border-radius: 999px;
+  background: rgba(240, 235, 220, 0.08);
+  font: 700 10px/1 system-ui, sans-serif;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.spark-status.is-ready,
+.spark-result-banner {
+  background: rgba(126, 181, 135, 0.16);
+  color: #d8f3dc;
+}
+
+.spark-result-banner {
+  padding: 8px 10px;
+  border: 1px solid rgba(126, 181, 135, 0.35);
+  border-radius: 6px;
+  font-size: 12px;
+}
+
+.spark-question {
+  display: grid;
+  gap: 9px;
+  padding: 11px;
+  border: 1px solid rgba(240, 235, 220, 0.1);
+  border-radius: 8px;
+  background: rgba(240, 235, 220, 0.05);
+}
+
+.spark-question header small {
+  color: #c8a165;
+  font-size: 11px;
+  text-transform: capitalize;
+}
+
+.spark-question p {
+  color: #e2d7c0;
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.spark-question em {
+  padding: 7px 8px;
+  border-radius: 6px;
+  background: rgba(126, 181, 135, 0.1);
+  font-style: normal;
+}
+
+.spark-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+.spark-option input {
+  margin: 0;
+  accent-color: #9fd2a9;
+}
+
+.spark-option:has(input:disabled) {
+  cursor: default;
+  opacity: 0.66;
+}
+
+.spark-submit {
+  min-height: 36px;
+  cursor: pointer;
+  font: 700 12px/1 system-ui, sans-serif;
+}
+
+.spark-submit:not(:disabled) {
+  border-color: rgba(126, 181, 135, 0.45);
+  background: rgba(126, 181, 135, 0.22);
+}
+
+.spark-submit:disabled {
+  cursor: default;
+  opacity: 0.5;
+}
+
 .narrator-lab {
   height: 100%;
   display: grid;
@@ -1361,7 +1580,8 @@ button {
 
   .anthrop-app,
   .buzz-app,
-  .narrator-lab {
+  .narrator-lab,
+  .spark-app {
     grid-template-columns: 1fr;
   }
 

@@ -28,6 +28,10 @@ export function makeFreshState(): GameState {
     messages: [],
     notes: [],
     chemistry: {},
+    academics: {
+      prep: {},
+      completedTests: {},
+    },
   };
 }
 
@@ -67,6 +71,10 @@ export function normalizeState(state: GameState): GameState {
     messages: migrateTimedRecords(state.messages, legacyTimeScale),
     notes: migrateTimedRecords(state.notes, legacyTimeScale),
     chemistry: state.chemistry || {},
+    academics: {
+      prep: state.academics?.prep || {},
+      completedTests: state.academics?.completedTests || {},
+    },
   };
 }
 
