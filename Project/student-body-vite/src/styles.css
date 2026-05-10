@@ -362,12 +362,44 @@ button {
 .compass-app {
   height: 100%;
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-rows: auto minmax(0, 1fr);
   gap: 14px;
   padding: 14px;
   overflow: hidden;
   background: #1a1814;
   color: #f0ebdc;
+}
+
+.compass-app__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+}
+
+.compass-app__tabs {
+  width: min(320px, 100%);
+  flex: 0 1 320px;
+}
+
+.compass-app__hint {
+  min-width: 0;
+  color: rgba(240, 235, 220, 0.5);
+  font-family: system-ui, sans-serif;
+  font-size: 11px;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.compass-app__columns {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  overflow: hidden;
 }
 
 .compass-app .phone-panel {
@@ -476,11 +508,83 @@ button {
   font-style: italic;
 }
 
+.location-button__npcs {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  min-width: 0;
+}
+
+.location-button__npc {
+  max-width: 100%;
+  padding: 2px 5px;
+  border: 1px solid rgba(200, 161, 101, 0.22);
+  border-radius: 999px;
+  color: #c8a165;
+  overflow: hidden;
+  font-size: 10px;
+  line-height: 1.2;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.location-button__travel {
+  grid-column: 1 / -1;
+  color: rgba(240, 235, 220, 0.54);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
 .location-button.is-current {
   border-color: rgba(200, 161, 101, 0.4);
   background: rgba(200, 161, 101, 0.18);
   color: #c8a165;
   cursor: default;
+}
+
+.compass-bulletin {
+  min-height: 0;
+}
+
+.bulletin-list {
+  min-height: 0;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.bulletin-card {
+  min-width: 0;
+  display: grid;
+  align-content: start;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid rgba(240, 235, 220, 0.1);
+  border-radius: 8px;
+  background: rgba(240, 235, 220, 0.05);
+  font-family: system-ui, sans-serif;
+}
+
+.bulletin-card small {
+  color: #c8a165;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.8px;
+  text-transform: uppercase;
+}
+
+.bulletin-card strong {
+  font-size: 13px;
+}
+
+.bulletin-card p {
+  margin: 0;
+  color: rgba(240, 235, 220, 0.72);
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .roster-list,
@@ -1655,8 +1759,26 @@ button {
 
   .anthrop-app,
   .buzz-app,
+  .compass-app__columns,
   .narrator-lab,
   .spark-app {
+    grid-template-columns: 1fr;
+  }
+
+  .compass-app__header {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .compass-app__tabs {
+    width: 100%;
+  }
+
+  .compass-app__hint {
+    text-align: left;
+  }
+
+  .bulletin-list {
     grid-template-columns: 1fr;
   }
 

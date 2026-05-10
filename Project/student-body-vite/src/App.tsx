@@ -180,6 +180,16 @@ export default function App() {
     }
   }, [generatingScene, showNotification, state]);
 
+  const handleCompassBulletinAction = useCallback((choice: Choice) => {
+    setState(current => {
+      if (!current) return current;
+      const update = applyChoice(current, choice);
+      if (update.notification) window.setTimeout(() => showNotification(update.notification!), 250);
+      return update.state;
+    });
+    setGeneratedScene(null);
+  }, [showNotification]);
+
   const handleSendMessage = useCallback((npcId: string, templateId: "check_in" | "ask_about_day" | "invite_coffee") => {
     if (!state) return;
     const update = sendPulseMessage(state, npcId, templateId);
@@ -253,7 +263,7 @@ export default function App() {
   if (phone.view.startsWith("app:")) {
     const appId = phone.view.slice(4);
     const app = APP_BY_ID[appId];
-    if (appId === "compass") phoneContent = <CompassApp state={state} onNavigate={handleNavigate} />;
+    if (appId === "compass") phoneContent = <CompassApp state={state} onNavigate={handleNavigate} onBulletinAction={handleCompassBulletinAction} />;
     else if (appId === "pulse") phoneContent = <PulseApp state={state} onSendMessage={handleSendMessage} />;
     else if (appId === "roster") phoneContent = <RosterApp state={state} />;
     else if (appId === "self") phoneContent = <SelfApp state={state} />;

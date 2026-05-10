@@ -1,11 +1,12 @@
 import type { Choice, GameMessage, GameNote, GameState, GameUpdate, LocationId, NpcId, StatKey } from "../types/game";
-import { DEFAULT_ACTION_CHUNKS, formatDuration, LOCATIONS } from "../data/locations";
+import { DEFAULT_ACTION_CHUNKS } from "../data/locations";
 import { STARTER_NPCS } from "../data/npcs";
 import { advanceTime, appendEvent } from "./state";
 import { updateRoommateStudiousChemistry } from "./chemistry";
 import { addAcademicPrep } from "./academics";
-import { maybeIssueCalendarReminder } from "./calendar";
+import { getLocationDirectory, maybeIssueCalendarReminder } from "./calendar";
 import { learnLocation, visitLocation } from "./locationKnowledge";
+import { getTravelPlan } from "./travel";
 
 const messageResponses: Record<string, string> = {
   check_in: "Hey. Still alive over there?",
@@ -67,9 +68,24 @@ function addTrait(state: GameState, trait: string): GameState {
   return { ...state, player: { ...state.player, traits: [...traits, trait] } };
 }
 
+function currentLocationLabel(state: GameState) {
+  return getLocationDirectory(state)[state.location]?.label || state.location;
+}
+
 function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
   let next = state;
   let notification: GameUpdate["notification"];
+
+  if (choice.id.startsWith("bulletin_event_")) {
+    const note: GameNote = {
+      id: `${state.day}-${state.timeSlot}-${choice.id}`,
+      day: state.day,
+      slot: state.timeSlot,
+      text: `Pinned from the Student Union board: ${choice.label}`,
+    };
+    next = appendEvent({ ...next, notes: [...next.notes, note] }, `Pinned a Student Union bulletin: ${choice.label}.`);
+    return { state: next, notification: { app: "Anthrop", body: "Pinned to Margin as a commitment." } };
+  }
 
   switch (choice.id) {
     case "study_deep":
@@ -102,6 +118,21 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
       next = addTrait(changeStats(next, { charm: 1, knowledge: 1 }), "campus-curious");
       next = appendEvent(next, "Browsed the student union flyer board.");
       notification = { app: "Buzz", body: "A few campus events caught your eye." };
+      break;
+    case "bulletin_study_group":
+      next = addAcademicPrep(addTrait(changeStats(next, { knowledge: 1, grit: 1 }), "study-table-curious"), "soc101", { studyChunks: 2, focus: 1 });
+      next = appendEvent(next, "Saved a SOC 101 study table from the Student Union bulletin board.");
+      notification = { app: "Spark", body: "Study table lead saved." };
+      break;
+    case "bulletin_club_fair":
+      next = addTrait(changeStats(next, { charm: 1, sensitivity: 1 }), "club-curious");
+      next = appendEvent(next, "Marked interest in the club fair preview from the Union board.");
+      notification = { app: "Buzz", body: "Club fair interest noted." };
+      break;
+    case "bulletin_job_lead":
+      next = addTrait(changeStats(next, { grit: 1 }), "job-curious");
+      next = appendEvent(next, "Copied a part-time desk shift lead from the Union board.");
+      notification = { app: "Anthrop", body: "Part-time job lead copied." };
       break;
     case "people_watch":
       next = changeStats(next, { sensitivity: 2, charm: 1 });
@@ -142,6 +173,10 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
       next = changeRelationship(next, "studious", 1, "friendly");
       next = appendEvent(next, "Chatted with Mari at the coffee shop counter.", ["studious"]);
       break;
+    case "look_around_location":
+      next = changeStats(next, { sensitivity: 1 });
+      next = appendEvent(next, `Looked around ${currentLocationLabel(next)} and got a better read on the place.`);
+      break;
     case "leave":
       next = appendEvent(next, "Decided not to linger.");
       break;
@@ -153,6 +188,7 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
 }
 
 function getChoiceDurationChunks(choice: Choice) {
+  if (choice.id.startsWith("bulletin_event_")) return 1;
   const durations: Record<string, number> = {
     go_coffee: 2,
     explore: 4,
@@ -173,6 +209,10 @@ function getChoiceDurationChunks(choice: Choice) {
     tidy_room: 4,
     sit_window: 6,
     chat_counter: 3,
+    bulletin_study_group: 1,
+    bulletin_club_fair: 1,
+    bulletin_job_lead: 1,
+    look_around_location: 2,
     rest: 8,
     wait: 4,
     leave: 1,
@@ -180,22 +220,23 @@ function getChoiceDurationChunks(choice: Choice) {
   return durations[choice.id] || DEFAULT_ACTION_CHUNKS;
 }
 
-function getTravelDurationChunks(fromLocation: LocationId, toLocation: LocationId) {
-  if (!fromLocation || !toLocation || fromLocation === toLocation) return 0;
-  const fromCat = LOCATIONS[fromLocation]?.cat;
-  const toCat = LOCATIONS[toLocation]?.cat;
-  if (fromCat === "campus" && toCat === "campus") return 1;
-  if (fromCat === toCat) return 2;
-  if ((fromCat === "campus" && toCat === "town") || (fromCat === "town" && toCat === "campus")) return 2;
-  return 3;
-}
-
 export function navigateToLocation(state: GameState, locationKey: LocationId): GameUpdate {
   if (state.location === locationKey) return { state };
 
-  const destination = LOCATIONS[locationKey]?.label || locationKey;
-  const travelChunks = getTravelDurationChunks(state.location, locationKey);
-  const next = advanceTime(appendEvent(state, `Walked to ${destination} (${formatDuration(travelChunks)})`), travelChunks);
+  const travelPlan = getTravelPlan(state, locationKey);
+  if (!travelPlan.canAfford) {
+    return {
+      state,
+      notification: { app: "Compass", body: travelPlan.blockedReason || "You cannot afford that trip right now." },
+    };
+  }
+
+  const verb = travelPlan.mode === "Walk" ? "Walked" : travelPlan.mode === "Bike" ? "Biked" : "Rode";
+  const traveled = appendEvent(state, `${verb} to ${travelPlan.toLabel} (${travelPlan.durationLabel}, ${travelPlan.costLabel})`);
+  const next = changeResources(advanceTime(traveled, travelPlan.durationChunks), {
+    energy: -travelPlan.energyCost,
+    money: -travelPlan.moneyCost,
+  });
   return withCalendarReminder(updateRoommateStudiousChemistry(
     visitLocation({ ...next, location: locationKey }, locationKey),
     { kind: "navigate", from: state.location, to: locationKey },

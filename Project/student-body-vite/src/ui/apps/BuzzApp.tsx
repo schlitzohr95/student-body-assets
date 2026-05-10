@@ -1,5 +1,4 @@
-import { LOCATIONS } from "../../data/locations";
-import { formatCalendarEventTime, getUpcomingCalendarEvents } from "../../engine/calendar";
+import { formatCalendarEventTime, getLocationDirectory, getUpcomingCalendarEvents } from "../../engine/calendar";
 import type { GameState } from "../../types/game";
 import { eventSummary, formatMoment } from "../format";
 
@@ -21,12 +20,13 @@ export function BuzzApp({ state }: BuzzAppProps) {
   const feed = [...feedItems.slice(offset), ...feedItems.slice(0, offset)].slice(0, 4);
   const recent = state.eventLog.slice(-4).reverse();
   const upcoming = getUpcomingCalendarEvents(state, 96).slice(0, 3);
+  const locations = getLocationDirectory(state);
 
   return (
     <div className="buzz-app">
       <section className="phone-panel buzz-hero">
         <h2>Campus Pulse</h2>
-        <p>{LOCATIONS[state.location]?.label || state.location} is trending around your current orbit.</p>
+        <p>{locations[state.location]?.label || state.location} is trending around your current orbit.</p>
       </section>
       <section className="phone-panel">
         <h2>Feed</h2>

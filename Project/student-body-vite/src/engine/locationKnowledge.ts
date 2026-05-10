@@ -41,7 +41,7 @@ function defaultKnowledge(locationId: LocationId, location?: LocationDefinition)
 
   return {
     state: "known",
-    hoursKnown: false,
+    hoursKnown: true,
   };
 }
 

@@ -1,5 +1,4 @@
-import { LOCATIONS } from "../../data/locations";
-import { formatCalendarEventTime, getUpcomingCalendarEvents } from "../../engine/calendar";
+import { formatCalendarEventTime, getLocationDirectory, getUpcomingCalendarEvents } from "../../engine/calendar";
 import type { GameState, StatKey } from "../../types/game";
 import { eventSummary, formatMoment } from "../format";
 
@@ -35,13 +34,14 @@ export function AnthropApp({ state }: AnthropAppProps) {
     .slice(-3)
     .reverse();
   const upcoming = getUpcomingCalendarEvents(state, 96).slice(0, 4);
+  const locations = getLocationDirectory(state);
 
   return (
     <div className="anthrop-app">
       <section className="phone-panel anthrop-card">
         <h2>Readout</h2>
         <p>
-          Week {Math.floor((state.day - 1) / 7) + 1}, currently at {LOCATIONS[state.location]?.label || state.location}.
+          Week {Math.floor((state.day - 1) / 7) + 1}, currently at {locations[state.location]?.label || state.location}.
           Your strongest stat is {statLabels[strong]} and the easiest gain right now is probably {statLabels[weak]}.
         </p>
         <p>

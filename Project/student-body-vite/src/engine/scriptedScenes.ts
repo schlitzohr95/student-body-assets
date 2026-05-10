@@ -1,5 +1,6 @@
 import type { GameState, Scene } from "../types/game";
-import { getDaypartLabel, LOCATIONS } from "../data/locations";
+import { getDaypartLabel } from "../data/locations";
+import { getLocationDirectory, getNpcsAtLocation } from "./calendar";
 
 export function getScriptedScene(state: GameState): Scene {
   const { location, day, timeSlot, metMari, introSeen } = state;
@@ -81,7 +82,7 @@ export function getScriptedScene(state: GameState): Scene {
       narration:
         "The student union is busy in layers: club tables near the doors, people waiting for food, someone laughing too loudly by the bulletin board.",
       choices: [
-        { id: "browse_flyers", label: "Browse the flyer board" },
+        { id: "browse_flyers", label: "Check the bulletin board" },
         { id: "people_watch", label: "People-watch from a couch" },
         { id: "leave", label: "Cut through and leave" },
       ],
@@ -124,11 +125,16 @@ export function getScriptedScene(state: GameState): Scene {
     };
   }
 
-  const loc = LOCATIONS[location];
+  const loc = getLocationDirectory(state)[location];
   const partOfDay = getDaypartLabel(timeSlot).toLowerCase();
+  const present = getNpcsAtLocation(state, location).slice(0, 3).map(npc => npc.name || npc.id);
+  const presentText = present.length ? ` ${present.join(", ")} ${present.length === 1 ? "is" : "are"} around.` : "";
   return {
-    narration: `${loc?.label || "Here"}. ${partOfDay}, day ${day}. The semester keeps moving around you.`,
+    narration: loc
+      ? `${loc.label}. ${loc.description}${presentText} It is ${partOfDay}, day ${day}, and the semester keeps moving around you.`
+      : `Here. ${partOfDay}, day ${day}. The semester keeps moving around you.`,
     choices: [
+      { id: "look_around_location", label: "Look around" },
       { id: "wait", label: "Spend some time here" },
       { id: "leave", label: "Move on" },
     ],
