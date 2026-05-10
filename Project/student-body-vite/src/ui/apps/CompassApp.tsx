@@ -1,4 +1,5 @@
 import { LOCATIONS } from "../../data/locations";
+import { normalizeLocationMap } from "../../engine/worldPacks";
 import type { GameState, LocationCategory, LocationId } from "../../types/game";
 
 interface CompassAppProps {
@@ -13,13 +14,15 @@ const groups: Array<{ label: string; cat: LocationCategory }> = [
 ];
 
 export function CompassApp({ state, onNavigate }: CompassAppProps) {
+  const locations = { ...LOCATIONS, ...normalizeLocationMap(state.world?.locations) };
+
   return (
     <div className="compass-app">
       {groups.map(group => (
         <section className="phone-panel" key={group.cat}>
           <h2>{group.label}</h2>
           <div className="location-list">
-            {Object.values(LOCATIONS)
+            {Object.values(locations)
               .filter(location => location.cat === group.cat)
               .map(location => {
                 const isHere = location.id === state.location;

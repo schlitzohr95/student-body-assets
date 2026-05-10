@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   requestNarratorContext,
   requestNarratorScene,
@@ -8,7 +8,10 @@ import {
 } from "../../narrator/client";
 import { buildNarratorContext } from "../../narrator/context";
 import { BENCH_SCENARIOS, makeBenchResult, type NarratorBenchResult } from "../../narrator/testBench";
-import type { GameState } from "../../types/game";
+import { normalizeLocationMap, normalizeNpcMap, type WorldPackImportSummary } from "../../engine/worldPacks";
+import { exportJsonFile, readJsonFile } from "../../services/jsonFiles";
+import { fetchWorldPack, fetchWorldPackCatalog, type WorldPackCatalogEntry } from "../../services/worldPackCatalog";
+import type { GameState, NarratorSceneMode, NarratorSettings, WorldPack } from "../../types/game";
 
 const DEFAULT_ENDPOINT = "http://127.0.0.1:8787/narrate";
 const DEFAULT_ACTION = "Continue this moment as a single call using only the supplied context.";
@@ -23,6 +26,10 @@ interface FreeModelOption {
 interface NarratorLabAppProps {
   state: GameState;
   onApplyResult: (result: NarratorRunResult, action: string) => void;
+  narratorSettings: NarratorSettings;
+  onNarratorSettingsChange: (settings: Partial<NarratorSettings>) => void;
+  onImportState: (state: GameState) => void;
+  onImportWorldPack: (pack: WorldPack, sourceFileName?: string) => WorldPackImportSummary;
 }
 
 function freeModelsEndpoint(endpoint: string): string {
@@ -37,10 +44,25 @@ function freeModelsEndpoint(endpoint: string): string {
   }
 }
 
-export function NarratorLabApp({ state, onApplyResult }: NarratorLabAppProps) {
-  const [providerType, setProviderType] = useState<NarratorProviderType>("mock");
-  const [endpoint, setEndpoint] = useState(DEFAULT_ENDPOINT);
-  const [model, setModel] = useState("");
+function unwrapSavePayload(payload: unknown): GameState {
+  if (payload && typeof payload === "object" && "state" in payload) {
+    return (payload as { state: GameState }).state;
+  }
+  return payload as GameState;
+}
+
+export function NarratorLabApp({
+  state,
+  onApplyResult,
+  narratorSettings,
+  onNarratorSettingsChange,
+  onImportState,
+  onImportWorldPack,
+}: NarratorLabAppProps) {
+  const [sceneMode, setSceneMode] = useState<NarratorSceneMode>(narratorSettings.mode || "scripted");
+  const [providerType, setProviderType] = useState<NarratorProviderType>(narratorSettings.providerType || "http");
+  const [endpoint, setEndpoint] = useState(narratorSettings.endpoint || DEFAULT_ENDPOINT);
+  const [model, setModel] = useState(narratorSettings.model || "");
   const [freeModels, setFreeModels] = useState<FreeModelOption[]>([]);
   const [modelsFetchedAt, setModelsFetchedAt] = useState<string | null>(null);
   const [modelsLoading, setModelsLoading] = useState(false);
@@ -48,13 +70,21 @@ export function NarratorLabApp({ state, onApplyResult }: NarratorLabAppProps) {
   const [hasRequestedModels, setHasRequestedModels] = useState(false);
   const [action, setAction] = useState(DEFAULT_ACTION);
   const [scenarioId, setScenarioId] = useState(BENCH_SCENARIOS[0]?.id || "");
-  const [activeView, setActiveView] = useState<"result" | "bench" | "context" | "raw">("result");
+  const [activeView, setActiveView] = useState<"result" | "bench" | "context" | "raw" | "state">("result");
   const [result, setResult] = useState<NarratorRunResult | null>(null);
   const [benchResults, setBenchResults] = useState<NarratorBenchResult[]>([]);
   const [benchRunning, setBenchRunning] = useState(false);
   const [benchError, setBenchError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [toolMessage, setToolMessage] = useState<string | null>(null);
+  const [packCatalog, setPackCatalog] = useState<WorldPackCatalogEntry[]>([]);
+  const [selectedPackId, setSelectedPackId] = useState("");
+  const [packCatalogLoading, setPackCatalogLoading] = useState(false);
+  const [packCatalogError, setPackCatalogError] = useState<string | null>(null);
+  const [hasRequestedPackCatalog, setHasRequestedPackCatalog] = useState(false);
   const [running, setRunning] = useState(false);
+  const saveInputRef = useRef<HTMLInputElement | null>(null);
+  const worldPackInputRef = useRef<HTMLInputElement | null>(null);
 
   const provider = useMemo<NarratorProviderConfig>(() => ({
     type: providerType,
@@ -72,6 +102,19 @@ export function NarratorLabApp({ state, onApplyResult }: NarratorLabAppProps) {
   const [lastRunState, setLastRunState] = useState<GameState | null>(null);
   const canApply = Boolean(result?.parsed.statePatch);
   const canRunModel = providerType !== "http" || Boolean(model.trim());
+  const statePreview = useMemo(() => JSON.stringify(state, null, 2), [state]);
+  const worldPackMeta = state.world?.packMeta || [];
+  const latestWorldPack = worldPackMeta[worldPackMeta.length - 1];
+  const importedNpcCount = Object.keys(normalizeNpcMap(state.world?.npcs)).length;
+  const importedLocationCount = Object.keys(normalizeLocationMap(state.world?.locations)).length;
+  const selectedBundledPack = useMemo(
+    () => packCatalog.find(pack => pack.id === selectedPackId) || packCatalog[0],
+    [packCatalog, selectedPackId],
+  );
+
+  useEffect(() => {
+    onNarratorSettingsChange({ mode: sceneMode, providerType, endpoint, model });
+  }, [endpoint, model, onNarratorSettingsChange, providerType, sceneMode]);
 
   async function refreshFreeModels() {
     setModelsLoading(true);
@@ -96,6 +139,10 @@ export function NarratorLabApp({ state, onApplyResult }: NarratorLabAppProps) {
   useEffect(() => {
     if (providerType === "http" && !hasRequestedModels) void refreshFreeModels();
   }, [hasRequestedModels, providerType]);
+
+  useEffect(() => {
+    if (!hasRequestedPackCatalog) void refreshPackCatalog();
+  }, [hasRequestedPackCatalog]);
 
   async function runSingleCall() {
     if (!canRunModel) {
@@ -208,13 +255,7 @@ export function NarratorLabApp({ state, onApplyResult }: NarratorLabAppProps) {
       stateBeforeRun: lastRunState,
       stateAtExport: state,
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `student-body-narrator-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-    anchor.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 500);
+    exportJsonFile("student-body-narrator", payload);
   }
 
   function exportBenchJson() {
@@ -228,13 +269,84 @@ export function NarratorLabApp({ state, onApplyResult }: NarratorLabAppProps) {
       providerType,
       results: benchResults,
     };
-    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = url;
-    anchor.download = `student-body-bench-${new Date().toISOString().replace(/[:.]/g, "-")}.json`;
-    anchor.click();
-    window.setTimeout(() => URL.revokeObjectURL(url), 500);
+    exportJsonFile("student-body-bench", payload);
+  }
+
+  function exportSaveJson() {
+    exportJsonFile("student-body-save", {
+      exportKind: "student-body-save",
+      exportedAt: new Date().toISOString(),
+      state,
+    });
+    setToolMessage("Save JSON exported.");
+    setActiveView("state");
+  }
+
+  async function importSaveFile(file: File) {
+    try {
+      const payload = await readJsonFile(file);
+      const importedState = unwrapSavePayload(payload);
+      if (!importedState || typeof importedState !== "object") throw new Error("Save file did not contain a game state.");
+      onImportState(importedState);
+      setGeneratedToolMessage(`Imported save from ${file.name}.`);
+    } catch (caught) {
+      setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  async function importWorldPackFile(file: File) {
+    try {
+      const pack = await readJsonFile<WorldPack>(file);
+      if (!pack || typeof pack !== "object") throw new Error("World pack file did not contain an object.");
+      const summary = onImportWorldPack(pack, file.name);
+      setGeneratedToolMessage(`Imported ${summary.name}: ${summary.npcCount} NPCs, ${summary.locationCount} locations.`);
+    } catch (caught) {
+      setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  async function refreshPackCatalog() {
+    setPackCatalogLoading(true);
+    setPackCatalogError(null);
+    setHasRequestedPackCatalog(true);
+
+    try {
+      const packs = await fetchWorldPackCatalog();
+      setPackCatalog(packs);
+      if (!selectedPackId && packs[0]) setSelectedPackId(packs[0].id);
+    } catch (caught) {
+      setPackCatalogError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setPackCatalogLoading(false);
+    }
+  }
+
+  async function loadBundledWorldPack() {
+    if (!selectedBundledPack) {
+      setGeneratedToolMessage("No bundled world pack is selected.");
+      return;
+    }
+
+    setPackCatalogLoading(true);
+    setPackCatalogError(null);
+
+    try {
+      const pack = await fetchWorldPack(selectedBundledPack);
+      const summary = onImportWorldPack(pack, selectedBundledPack.path);
+      setGeneratedToolMessage(`Loaded ${summary.name}: ${summary.npcCount} NPCs, ${summary.locationCount} locations.`);
+    } catch (caught) {
+      setPackCatalogError(caught instanceof Error ? caught.message : String(caught));
+      setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      setPackCatalogLoading(false);
+    }
+  }
+
+  function setGeneratedToolMessage(message: string) {
+    setToolMessage(message);
+    setError(null);
+    setBenchError(null);
+    setActiveView("state");
   }
 
   const latestBenchResult = benchResults[0];
@@ -315,6 +427,15 @@ export function NarratorLabApp({ state, onApplyResult }: NarratorLabAppProps) {
           )}
 
           <label className="field-stack">
+            <span>Generated scene mode</span>
+            <select value={sceneMode} onChange={event => setSceneMode(event.target.value as NarratorSceneMode)}>
+              <option value="scripted">Scripted scenes only</option>
+              <option value="generated">Generated next scene</option>
+              <option value="generated_fallback">Generated with scripted fallback</option>
+            </select>
+          </label>
+
+          <label className="field-stack">
             <span>Scenario preset</span>
             <select value={scenarioId} onChange={event => setScenarioId(event.target.value)}>
               {BENCH_SCENARIOS.map(scenario => (
@@ -356,7 +477,7 @@ export function NarratorLabApp({ state, onApplyResult }: NarratorLabAppProps) {
 
       <section className="phone-panel narrator-lab__output">
         <div className="narrator-tabs" role="tablist" aria-label="Narrator output">
-          {(["result", "bench", "context", "raw"] as const).map(view => (
+          {(["result", "bench", "context", "raw", "state"] as const).map(view => (
             <button
               className={activeView === view ? "is-active" : ""}
               type="button"
@@ -445,6 +566,104 @@ export function NarratorLabApp({ state, onApplyResult }: NarratorLabAppProps) {
 
         {activeView === "context" && <textarea className="narrator-text-preview" readOnly value={contextPreview} />}
         {activeView === "raw" && <textarea className="narrator-text-preview" readOnly value={result?.rawText || ""} />}
+        {activeView === "state" && (
+          <div className="state-tools-panel">
+            <input
+              ref={saveInputRef}
+              className="visually-hidden-file"
+              type="file"
+              accept=".json,application/json"
+              hidden
+              aria-hidden="true"
+              onChange={event => {
+                const file = event.currentTarget.files?.[0];
+                if (file) void importSaveFile(file);
+                event.currentTarget.value = "";
+              }}
+            />
+            <input
+              ref={worldPackInputRef}
+              className="visually-hidden-file"
+              type="file"
+              accept=".json,application/json"
+              hidden
+              aria-hidden="true"
+              onChange={event => {
+                const file = event.currentTarget.files?.[0];
+                if (file) void importWorldPackFile(file);
+                event.currentTarget.value = "";
+              }}
+            />
+
+            <section className="state-tool-section">
+              <header>
+                <h3>Save Tools</h3>
+                <span>Day {state.day}</span>
+              </header>
+              <div className="state-tool-actions">
+                <button className="secondary-button" type="button" onClick={exportSaveJson}>
+                  Export Save JSON
+                </button>
+                <button className="secondary-button" type="button" onClick={() => saveInputRef.current?.click()}>
+                  Import Save JSON
+                </button>
+                <button className="secondary-button" type="button" onClick={() => worldPackInputRef.current?.click()}>
+                  Import World Pack
+                </button>
+              </div>
+              {toolMessage && <div className="state-tool-message">{toolMessage}</div>}
+            </section>
+
+            <section className="state-tool-section">
+              <header>
+                <h3>World Pack</h3>
+                <span>{worldPackMeta.length} imported</span>
+              </header>
+              <div className="bundled-pack-picker">
+                <label className="field-stack">
+                  <span>Bundled world pack</span>
+                  <select
+                    value={selectedBundledPack?.id || ""}
+                    onChange={event => setSelectedPackId(event.target.value)}
+                    disabled={packCatalogLoading || !packCatalog.length}
+                  >
+                    <option value="">{packCatalogLoading ? "Loading..." : "Select a pack"}</option>
+                    {packCatalog.map(pack => (
+                      <option value={pack.id} key={pack.id}>{pack.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <button className="secondary-button" type="button" onClick={refreshPackCatalog} disabled={packCatalogLoading}>
+                  Refresh
+                </button>
+                <button className="secondary-button" type="button" onClick={loadBundledWorldPack} disabled={packCatalogLoading || !selectedBundledPack}>
+                  Load Pack
+                </button>
+              </div>
+              {selectedBundledPack?.description && <p className="pack-description">{selectedBundledPack.description}</p>}
+              {packCatalogError && <div className="narrator-error">{packCatalogError}</div>}
+              <dl className="world-pack-summary">
+                <div>
+                  <dt>Latest</dt>
+                  <dd>{latestWorldPack?.name || "none"}</dd>
+                </div>
+                <div>
+                  <dt>NPCs</dt>
+                  <dd>{importedNpcCount}</dd>
+                </div>
+                <div>
+                  <dt>Locations</dt>
+                  <dd>{importedLocationCount}</dd>
+                </div>
+              </dl>
+            </section>
+
+            <label className="field-stack state-inspector">
+              <span>Debug state inspector</span>
+              <textarea readOnly value={statePreview} />
+            </label>
+          </div>
+        )}
       </section>
     </div>
   );

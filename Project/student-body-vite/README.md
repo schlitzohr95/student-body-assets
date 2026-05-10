@@ -47,6 +47,14 @@ In `http` mode, Beacon can also refresh a dropdown of currently free OpenRouter 
 
 Beacon also includes a Test Bench. Pick a scenario preset, run the selected model, and it will score the response for usable narration, choices/open response, parseable `[STATE]`, event summary, witness ids, witness-boundary leaks, and patch size. Use **Run all** to compare the same model across every preset, then **Export Bench JSON** to save the comparison.
 
+Beacon's **Generated scene mode** controls the normal dialogue strip:
+
+- `Scripted scenes only`: default deterministic prototype behavior.
+- `Generated next scene`: normal dialogue choices ask the narrator for the next scene.
+- `Generated with scripted fallback`: same generated path, but rejected/failed responses fall back to the scripted scene.
+
+For live testing, set provider to `http`, pick one of the stronger free models such as `baidu/cobuddy:free` or `qwen/qwen3-next-80b-a3b-instruct:free`, then choose `Generated with scripted fallback` and put the phone away.
+
 You can run the same checks from the terminal:
 
 ```bash

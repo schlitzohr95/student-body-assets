@@ -1,6 +1,7 @@
 import { DAY_LABELS, formatTimeOfDay, LOCATIONS } from "../data/locations";
 import { STARTER_NPCS } from "../data/npcs";
-import type { GameEvent, GameState, Npc } from "../types/game";
+import { normalizeLocationMap } from "../engine/worldPacks";
+import type { GameEvent, GameState, LocationDefinition, Npc } from "../types/game";
 
 const NARRATOR_EVENT_LIMIT = 10;
 
@@ -28,6 +29,13 @@ function getNpcDirectory(state: GameState): Record<string, Npc> {
   }
 
   return directory;
+}
+
+function getLocationDirectory(state: GameState): Record<string, LocationDefinition> {
+  return {
+    ...LOCATIONS,
+    ...normalizeLocationMap(state.world?.locations),
+  };
 }
 
 function getExplicitPresentNpcs(state: GameState, directory: Record<string, Npc>): Npc[] | null {
@@ -134,7 +142,8 @@ export function buildNarratorContext(state: GameState, action?: string | { label
   const week = Math.floor((state.day - 1) / 7) + 1;
   const dayName = DAY_LABELS[(state.day - 1) % DAY_LABELS.length];
   const timeSlot = formatTimeOfDay(state.timeSlot);
-  const location = LOCATIONS[state.location] || { id: state.location, label: state.location, description: "No static description recorded yet." };
+  const locationDirectory = getLocationDirectory(state);
+  const location = locationDirectory[state.location] || { id: state.location, label: state.location, cat: "campus", description: "No static description recorded yet." };
   const npcDirectory = getNpcDirectory(state);
   const presentNpcs = getPresentNpcs(state, npcDirectory);
   const actionText = typeof action === "string" ? action.trim() : action?.label || action?.text || action?.description || "";

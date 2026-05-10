@@ -1,0 +1,188 @@
+{
+  "id": "campus-life-starter",
+  "name": "Campus Life Starter",
+  "version": "0.1.0",
+  "author": "Student Body dev pack",
+  "description": "A compact authored cast/world pack for testing non-LLM content loading.",
+  "npcs": {
+    "ra": {
+      "id": "ra",
+      "name": "Jordan Vale",
+      "portraitKey": "ra",
+      "archetype": "RA",
+      "role": "Resident assistant for the first-year floor",
+      "defaultLocation": "dorm_hallway",
+      "currentLocation": "dorm_hallway",
+      "schema": {
+        "ageBand": "older student",
+        "publicFace": "Calm, practiced, hard to surprise.",
+        "voice": "Warm but procedural; short questions that make people explain themselves.",
+        "wants": ["A quiet floor", "Students who ask for help before things explode"],
+        "whatLands": ["Accountability", "Specific requests", "Respecting shared spaces"],
+        "whatFallsFlat": ["Charm used as misdirection", "Lying by omission", "Treating policies like dares"],
+        "boundaries": ["Does not gossip about residents", "Will document safety issues"]
+      },
+      "currentMood": "Tired but attentive; listening for small signs of trouble.",
+      "lastSeenDisposition": "Not yet met."
+    },
+    "professor": {
+      "id": "professor",
+      "name": "Dr. Imani Hale",
+      "portraitKey": "professor",
+      "archetype": "Professor",
+      "role": "Intro sociology professor",
+      "defaultLocation": "lecture_hall",
+      "currentLocation": "lecture_hall",
+      "schema": {
+        "ageBand": "faculty",
+        "publicFace": "Precise, dryly funny, notices who did the reading.",
+        "voice": "Clear, economical, with sudden warmth when a student connects ideas.",
+        "wants": ["Students to make evidence-based claims", "Office hours to be used before panic"],
+        "whatLands": ["Prepared questions", "Humility with effort", "Connecting class to lived observation"],
+        "whatFallsFlat": ["Vague confidence", "Last-minute excuses", "Performing intelligence"],
+        "boundaries": ["Keeps academic distance", "Grades work, not charm"]
+      },
+      "currentMood": "Mentally sorting the room by who is awake and who is pretending.",
+      "lastSeenDisposition": "Not yet met."
+    },
+    "artistic": {
+      "id": "artistic",
+      "name": "Sloane Park",
+      "portraitKey": "artistic",
+      "archetype": "Artistic",
+      "role": "Studio arts student with a campus zine habit",
+      "defaultLocation": "art_studio",
+      "currentLocation": "art_studio",
+      "schema": {
+        "ageBand": "adult peer",
+        "publicFace": "Wry, restless, allergic to obvious answers.",
+        "voice": "Image-heavy, quick pivots, laughs when something is too honest.",
+        "wants": ["People who mean what they say", "A reason to trust campus life is not all branding"],
+        "whatLands": ["Specific taste", "Playful honesty", "Noticing details"],
+        "whatFallsFlat": ["Trying to sound profound", "Mocking sincerity", "Treating art as decoration"],
+        "boundaries": ["Private work stays private until invited"]
+      },
+      "currentMood": "Half-focused on a layout problem, half-hoping for a good interruption.",
+      "lastSeenDisposition": "Not yet met."
+    },
+    "athletic": {
+      "id": "athletic",
+      "name": "Nia Brooks",
+      "portraitKey": "athletic",
+      "archetype": "Athletic",
+      "role": "Track athlete and morning regular on the running trail",
+      "defaultLocation": "running_trail",
+      "currentLocation": "running_trail",
+      "schema": {
+        "ageBand": "adult peer",
+        "publicFace": "Direct, bright, competitive without needing an audience.",
+        "voice": "Plainspoken, teasing, quick to turn feelings into action.",
+        "wants": ["People who show up consistently", "A life that is not only training blocks"],
+        "whatLands": ["Follow-through", "Good humor under effort", "Respecting routines"],
+        "whatFallsFlat": ["Overpromising", "Excuses dressed as philosophy", "Comparing pain like currency"],
+        "boundaries": ["Training time is not casual hangout time unless invited"]
+      },
+      "currentMood": "Loose after a run, sharper if someone wastes her cooldown.",
+      "lastSeenDisposition": "Not yet met."
+    },
+    "townie": {
+      "id": "townie",
+      "name": "Vera Quinn",
+      "portraitKey": "townie",
+      "archetype": "Townie",
+      "role": "Bookstore clerk and town-side connector",
+      "defaultLocation": "bookstore",
+      "currentLocation": "bookstore",
+      "schema": {
+        "ageBand": "adult peer",
+        "publicFace": "Dry, observant, hard to impress but not unkind.",
+        "voice": "Deadpan, precise, occasionally startlingly generous.",
+        "wants": ["Students who notice town exists beyond campus", "Quiet competence at work"],
+        "whatLands": ["Remembering recommendations", "Not treating locals like scenery", "Useful curiosity"],
+        "whatFallsFlat": ["Campus entitlement", "Flirting as default setting", "Loud certainty"],
+        "boundaries": ["The bookstore is not a confessional booth"]
+      },
+      "currentMood": "Calm behind the register, cataloging people as fast as books.",
+      "lastSeenDisposition": "Not yet met."
+    }
+  },
+  "locations": {
+    "art_studio": {
+      "id": "art_studio",
+      "label": "Art Studio",
+      "cat": "campus",
+      "description": "A paint-marked studio with drying racks, half-finished forms, and arguments taped to the walls."
+    },
+    "seminar_room": {
+      "id": "seminar_room",
+      "label": "Seminar Room",
+      "cat": "campus",
+      "description": "A small discussion room where every chair feels a little too visible."
+    }
+  },
+  "schedules": {
+    "ra": {
+      "weekday": [
+        { "start": "18:00", "end": "20:00", "location": "dorm_hallway", "mood": "on duty" },
+        { "start": "21:00", "end": "22:30", "location": "dorm_room", "mood": "available if needed" }
+      ],
+      "weekend": [
+        { "start": "20:00", "end": "23:30", "location": "dorm_hallway", "mood": "watching the floor" }
+      ]
+    },
+    "professor": {
+      "monday": [
+        { "start": "10:00", "end": "11:15", "location": "lecture_hall", "mood": "teaching" },
+        { "start": "13:00", "end": "14:00", "location": "seminar_room", "mood": "office hours" }
+      ],
+      "wednesday": [
+        { "start": "10:00", "end": "11:15", "location": "lecture_hall", "mood": "teaching" }
+      ]
+    },
+    "artistic": {
+      "weekday": [
+        { "start": "14:00", "end": "17:00", "location": "art_studio", "mood": "working" },
+        { "start": "19:00", "end": "20:00", "location": "student_union", "mood": "zine table" }
+      ]
+    },
+    "athletic": {
+      "weekday": [
+        { "start": "06:30", "end": "08:00", "location": "running_trail", "mood": "training" },
+        { "start": "17:00", "end": "18:30", "location": "gym", "mood": "lifting" }
+      ]
+    },
+    "townie": {
+      "weekday": [
+        { "start": "11:00", "end": "18:00", "location": "bookstore", "mood": "working" }
+      ],
+      "weekend": [
+        { "start": "12:00", "end": "16:00", "location": "bookstore", "mood": "working" },
+        { "start": "19:00", "end": "21:00", "location": "park", "mood": "off the clock" }
+      ]
+    }
+  },
+  "arcs": [
+    {
+      "id": "first_floor_pressure",
+      "label": "First Floor Pressure",
+      "type": "social",
+      "beats": [
+        { "id": "ra_intro", "trigger": "visit_dorm_hallway_evening", "npcIds": ["ra"] },
+        { "id": "quiet_hours_warning", "trigger": "late_noise_or_party_flag", "npcIds": ["ra", "roommate"] }
+      ]
+    },
+    {
+      "id": "town_not_backdrop",
+      "label": "Town Is Not Backdrop",
+      "type": "relationship",
+      "beats": [
+        { "id": "bookstore_rec", "trigger": "visit_bookstore", "npcIds": ["townie"] },
+        { "id": "remembered_rec", "trigger": "mention_book_recommendation", "npcIds": ["townie"] }
+      ]
+    }
+  ],
+  "knownNpcIds": [],
+  "flags": {
+    "world_pack_campus_life_starter": true
+  }
+}

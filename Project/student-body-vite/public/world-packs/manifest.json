@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "packs": [
+    {
+      "id": "campus-life-starter",
+      "name": "Campus Life Starter",
+      "description": "Adds a small authored cast, two campus locations, starter NPC schedules, and early social arcs.",
+      "path": "/world-packs/campus-life-starter.json",
+      "npcCount": 5,
+      "locationCount": 2,
+      "tags": ["starter", "cast", "schedules", "arcs"]
+    }
+  ]
+}

@@ -209,6 +209,19 @@ button {
   background: rgba(200, 161, 101, 0.18);
 }
 
+.choice-button:disabled {
+  cursor: default;
+  opacity: 0.55;
+}
+
+.choice-row__status {
+  align-self: center;
+  color: #c8a165;
+  font: 700 11px/1 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .phone-layer {
   position: absolute;
   inset: 0;
@@ -1051,6 +1064,127 @@ button {
   padding: 6px 0 0 18px;
 }
 
+.state-tools-panel {
+  display: grid;
+  grid-template-rows: auto auto minmax(0, 1fr);
+  gap: 10px;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.state-tool-section {
+  display: grid;
+  gap: 8px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid rgba(240, 235, 220, 0.08);
+}
+
+.state-tool-section header,
+.world-pack-summary,
+.world-pack-summary div {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.state-tool-section h3,
+.world-pack-summary,
+.world-pack-summary dt,
+.world-pack-summary dd {
+  margin: 0;
+}
+
+.state-tool-section h3 {
+  color: #c8a165;
+  font-size: 13px;
+}
+
+.state-tool-section header span,
+.world-pack-summary dt {
+  color: #a89878;
+  font-size: 11px;
+}
+
+.state-tool-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.state-tool-actions .secondary-button {
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.state-tool-message {
+  padding: 7px 8px;
+  border: 1px solid rgba(200, 161, 101, 0.24);
+  border-radius: 6px;
+  background: rgba(200, 161, 101, 0.1);
+  color: #e2d7c0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.bundled-pack-picker {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.pack-description {
+  margin: 0;
+  color: #d8cbb3;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.world-pack-summary {
+  flex-wrap: wrap;
+}
+
+.world-pack-summary div {
+  min-width: 130px;
+  flex: 1;
+  padding: 7px 8px;
+  border: 1px solid rgba(240, 235, 220, 0.1);
+  border-radius: 6px;
+  background: rgba(240, 235, 220, 0.05);
+}
+
+.world-pack-summary dd {
+  min-width: 0;
+  color: #f0ebdc;
+  font-size: 12px;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.state-inspector {
+  min-height: 0;
+}
+
+.state-inspector textarea {
+  height: 100%;
+  min-height: 0;
+  resize: none;
+  padding: 10px;
+}
+
+.visually-hidden-file {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  pointer-events: none;
+  white-space: nowrap;
+}
+
 @media (max-width: 760px) {
   .game-shell {
     grid-template-rows: minmax(0, 68fr) minmax(210px, 32fr);
@@ -1080,6 +1214,14 @@ button {
   .anthrop-app,
   .buzz-app,
   .narrator-lab {
+    grid-template-columns: 1fr;
+  }
+
+  .state-tool-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .bundled-pack-picker {
     grid-template-columns: 1fr;
   }
 }

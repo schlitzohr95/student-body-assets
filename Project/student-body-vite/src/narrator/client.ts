@@ -73,7 +73,12 @@ function presentNpcIds(state: GameState): string[] {
   if (ids.length) return ids;
 
   const present = state.presentNpcs || state.scene?.npcsPresent || state.currentScene?.npcsPresent || [];
-  return present.map(npc => (typeof npc === "string" ? npc : npc.id)).filter(Boolean);
+  const explicitPresent = present.map(npc => (typeof npc === "string" ? npc : npc.id)).filter(Boolean);
+  if (explicitPresent.length) return explicitPresent;
+
+  if (state.location === "coffee_shop") return ["studious"];
+  if (state.location === "dorm_room" && state.introSeen) return ["roommate"];
+  return [];
 }
 
 function textFromContent(content: unknown): string {

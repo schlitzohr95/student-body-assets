@@ -4,6 +4,7 @@ export type LocationCategory = "campus" | "town" | "outdoor";
 
 export type LocationId = string;
 export type NpcId = string;
+export type NarratorSceneMode = "scripted" | "generated" | "generated_fallback";
 
 export interface PlayerStats extends Record<StatKey, number> {}
 
@@ -103,6 +104,49 @@ export interface LocationDefinition {
   description: string;
 }
 
+export interface WorldPackMeta {
+  id?: string;
+  name?: string;
+  version?: string;
+  author?: string;
+  description?: string;
+  importedAt?: string;
+  sourceFileName?: string;
+  [key: string]: unknown;
+}
+
+export interface WorldPack {
+  id?: string;
+  name?: string;
+  version?: string;
+  author?: string;
+  description?: string;
+  npcs?: Npc[] | Record<NpcId, Npc>;
+  characters?: Npc[] | Record<NpcId, Npc>;
+  cast?: Npc[] | Record<NpcId, Npc>;
+  locations?: LocationDefinition[] | Record<LocationId, LocationDefinition>;
+  places?: LocationDefinition[] | Record<LocationId, LocationDefinition>;
+  schedules?: Record<string, unknown>;
+  npcSchedules?: Record<NpcId, unknown>;
+  arcs?: unknown;
+  storyArcs?: unknown;
+  knownNpcIds?: NpcId[];
+  flags?: Record<string, unknown>;
+  [key: string]: unknown;
+}
+
+export interface GameWorldState {
+  npcs?: Npc[] | Record<NpcId, Npc>;
+  characters?: Npc[] | Record<NpcId, Npc>;
+  locations?: LocationDefinition[] | Record<LocationId, LocationDefinition>;
+  schedules?: Record<string, unknown>;
+  npcSchedules?: Record<NpcId, unknown>;
+  arcs?: unknown;
+  storyArcs?: unknown;
+  packMeta?: WorldPackMeta[];
+  [key: string]: unknown;
+}
+
 export interface Choice {
   id: string;
   label: string;
@@ -112,6 +156,13 @@ export interface Choice {
 export interface Scene {
   narration: string;
   choices: Choice[];
+}
+
+export interface NarratorSettings {
+  mode: NarratorSceneMode;
+  providerType: "mock" | "window" | "http";
+  endpoint?: string;
+  model?: string;
 }
 
 export interface GameState {
@@ -127,6 +178,7 @@ export interface GameState {
   eventLog: GameEvent[];
   messages: GameMessage[];
   notes: GameNote[];
+  narrator?: NarratorSettings;
   npcDirectory?: Record<NpcId, Npc>;
   npcMoods?: Record<NpcId, string>;
   presentNpcIds?: NpcId[];
@@ -139,10 +191,7 @@ export interface GameState {
     presentNpcIds?: NpcId[];
     npcsPresent?: Array<NpcId | Npc>;
   };
-  world?: {
-    npcs?: Npc[] | Record<NpcId, Npc>;
-    characters?: Npc[] | Record<NpcId, Npc>;
-  };
+  world?: GameWorldState;
   flags?: Record<string, unknown>;
 }
 
