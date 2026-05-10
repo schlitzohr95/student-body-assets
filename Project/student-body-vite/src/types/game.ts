@@ -74,6 +74,10 @@ export interface GameMessage {
   direction: "outgoing" | "incoming";
   text: string;
   read: boolean;
+  delivered?: boolean;
+  availableDay?: number;
+  availableSlot?: number;
+  templateId?: string;
 }
 
 export interface GameNote {
@@ -81,6 +85,14 @@ export interface GameNote {
   day: number;
   slot: number;
   text: string;
+  links?: {
+    npcIds?: NpcId[];
+    locationId?: LocationId;
+    courseIds?: string[];
+    eventIds?: string[];
+    category?: "general" | "npc" | "class" | "location" | "event";
+  };
+  source?: string;
 }
 
 export interface ChemistryObservation {
@@ -232,6 +244,15 @@ export interface CalendarState {
   seenReminderIds: string[];
 }
 
+export interface WakeState {
+  alarmSlot: TimeSlotIndex;
+  lastSleepDay?: number;
+  lastSleepSlot?: TimeSlotIndex;
+  lastWakeDay?: number;
+  lastWakeSlot?: TimeSlotIndex;
+  missedMorningBlocks?: number;
+}
+
 export interface NpcScheduleBlock {
   start: string | number;
   end?: string | number;
@@ -374,6 +395,7 @@ export interface GameState {
   chemistry?: Record<string, ChemistryRecord>;
   academics?: AcademicsState;
   calendar?: CalendarState;
+  wake?: WakeState;
   narrator?: NarratorSettings;
   npcDirectory?: Record<NpcId, Npc>;
   npcMoods?: Record<NpcId, string>;

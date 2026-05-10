@@ -5,11 +5,14 @@ import { makeFreshState, normalizeState } from "./engine/state";
 import { addMarginNote, applyChoice, navigateToLocation, sendPulseMessage } from "./engine/transitions";
 import { applyWorldPack } from "./engine/worldPacks";
 import { submitAcademicTest } from "./engine/academics";
+import { maybeIssueCalendarReminder } from "./engine/calendar";
+import { deliverDuePulseReplies, markPulseThreadRead, type PulseTemplateId } from "./engine/pulse";
+import { sleepUntilAlarm } from "./engine/wake";
 import { applyNarratorStatePatch } from "./narrator/patch";
 import { requestNarratorScene, type NarratorProviderConfig, type NarratorRunResult } from "./narrator/client";
 import { validateGeneratedScene } from "./narrator/validation";
 import { clearState, loadState, saveState } from "./services/storage";
-import type { AcademicAnswerValue, AcademicTestResult, Choice, GameState, LocationId, NarratorSettings, Scene, WorldPack } from "./types/game";
+import type { AcademicAnswerValue, AcademicTestResult, Choice, GameNote, GameState, LocationId, NarratorSettings, NpcId, Scene, WorldPack } from "./types/game";
 import { CompassApp } from "./ui/apps/CompassApp";
 import { AnthropApp } from "./ui/apps/AnthropApp";
 import { BuzzApp } from "./ui/apps/BuzzApp";
@@ -20,6 +23,7 @@ import { RosterApp } from "./ui/apps/RosterApp";
 import { SelfApp } from "./ui/apps/SelfApp";
 import { SparkApp } from "./ui/apps/SparkApp";
 import { StubApp } from "./ui/apps/StubApp";
+import { WakeApp } from "./ui/apps/WakeApp";
 import { DialogueStrip } from "./ui/components/DialogueStrip";
 import { FloatingControls } from "./ui/components/FloatingControls";
 import { HeaderBar } from "./ui/components/HeaderBar";
@@ -190,17 +194,32 @@ export default function App() {
     setGeneratedScene(null);
   }, [showNotification]);
 
-  const handleSendMessage = useCallback((npcId: string, templateId: "check_in" | "ask_about_day" | "invite_coffee") => {
+  const handleSendMessage = useCallback((npcId: string, templateId: PulseTemplateId) => {
     if (!state) return;
     const update = sendPulseMessage(state, npcId, templateId);
     setState(update.state);
     if (update.notification) showNotification(update.notification);
   }, [showNotification, state]);
 
-  const handleAddNote = useCallback((text: string) => {
+  const handleMarkPulseRead = useCallback((npcId?: NpcId) => {
+    setState(current => current ? markPulseThreadRead(current, npcId) : current);
+  }, []);
+
+  const handleAddNote = useCallback((text: string, links?: GameNote["links"]) => {
     if (!state) return;
-    setState(addMarginNote(state, text).state);
+    setState(addMarginNote(state, text, links).state);
   }, [state]);
+
+  const handleSleep = useCallback((alarmSlot: number) => {
+    if (!state) return;
+    const wakeUpdate = sleepUntilAlarm(state, alarmSlot);
+    const pulseUpdate = deliverDuePulseReplies(wakeUpdate.state);
+    const reminderUpdate = maybeIssueCalendarReminder(pulseUpdate.state);
+    setState(reminderUpdate.state);
+    showNotification(wakeUpdate.notification || pulseUpdate.notification || reminderUpdate.notification || { app: "Wake", body: "Alarm complete." });
+    setGeneratedScene(null);
+    setPhone({ open: false, view: "home", orientation: "portrait" });
+  }, [showNotification, state]);
 
   const handleApplyNarratorResult = useCallback((result: NarratorRunResult) => {
     setState(current => current ? applyNarratorStatePatch(current, result.parsed.statePatch) : current);
@@ -264,13 +283,14 @@ export default function App() {
     const appId = phone.view.slice(4);
     const app = APP_BY_ID[appId];
     if (appId === "compass") phoneContent = <CompassApp state={state} onNavigate={handleNavigate} onBulletinAction={handleCompassBulletinAction} />;
-    else if (appId === "pulse") phoneContent = <PulseApp state={state} onSendMessage={handleSendMessage} />;
+    else if (appId === "pulse") phoneContent = <PulseApp state={state} onSendMessage={handleSendMessage} onMarkRead={handleMarkPulseRead} />;
     else if (appId === "roster") phoneContent = <RosterApp state={state} />;
     else if (appId === "self") phoneContent = <SelfApp state={state} />;
     else if (appId === "buzz") phoneContent = <BuzzApp state={state} />;
     else if (appId === "anthrop") phoneContent = <AnthropApp state={state} />;
     else if (appId === "spark") phoneContent = <SparkApp state={state} onSubmitTest={handleSubmitAcademicTest} />;
     else if (appId === "margin") phoneContent = <MarginApp state={state} onAddNote={handleAddNote} />;
+    else if (appId === "wake") phoneContent = <WakeApp state={state} onSleep={handleSleep} />;
     else if (appId === "beacon") {
       phoneContent = (
         <NarratorLabApp
@@ -307,6 +327,7 @@ export default function App() {
             else if (notification?.app === "Buzz") openApp("buzz");
             else if (notification?.app === "Spark") openApp("spark");
             else if (notification?.app === "Anthrop") openApp("anthrop");
+            else if (notification?.app === "Wake") openApp("wake");
             else openPhoneHome();
           }}
         />

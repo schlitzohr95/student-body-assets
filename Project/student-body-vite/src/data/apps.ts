@@ -10,7 +10,7 @@ export const APPS: PhoneAppDefinition[] = [
   { id: "spark", label: "Spark", role: "Academics", layout: "landscape", implemented: true },
   { id: "margin", label: "Margin", role: "Notes", layout: "portrait", implemented: true },
   { id: "lens", label: "Lens", role: "Camera", layout: "landscape", implemented: false },
-  { id: "wake", label: "Wake", role: "Alarm", layout: "portrait", implemented: false },
+  { id: "wake", label: "Wake", role: "Alarm", layout: "portrait", implemented: true },
   { id: "beacon", label: "Beacon", role: "Narrator Lab", layout: "landscape", implemented: true },
 ];
 

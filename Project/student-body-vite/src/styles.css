@@ -894,6 +894,48 @@ button {
   font-family: system-ui, sans-serif;
 }
 
+.pulse-app--v2 {
+  grid-template-rows: auto minmax(0, 1fr);
+  padding: 12px;
+  background: #f2eadb;
+}
+
+.pulse-contact-list {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(118px, 1fr);
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.pulse-contact {
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 8px 10px;
+  border: 1px solid rgba(58, 53, 48, 0.12);
+  border-radius: 6px;
+  background: rgba(58, 53, 48, 0.04);
+  color: #302b24;
+  cursor: pointer;
+  text-align: left;
+}
+
+.pulse-contact.is-selected {
+  border-color: rgba(139, 111, 61, 0.42);
+  background: rgba(200, 161, 101, 0.2);
+}
+
+.pulse-contact span {
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.pulse-contact small {
+  color: #7a6e58;
+  font-size: 11px;
+}
+
 .pulse-thread {
   display: grid;
   gap: 10px;
@@ -901,6 +943,30 @@ button {
   border: 1px solid rgba(58, 53, 48, 0.1);
   border-radius: 8px;
   background: rgba(58, 53, 48, 0.05);
+}
+
+.pulse-thread--active {
+  min-height: 0;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  overflow: hidden;
+}
+
+.pulse-thread header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.pulse-thread header button {
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid rgba(58, 53, 48, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.45);
+  color: #302b24;
+  cursor: pointer;
+  font-size: 11px;
 }
 
 .pulse-thread h2,
@@ -922,6 +988,12 @@ button {
   gap: 8px;
 }
 
+.message-list--history {
+  align-content: start;
+  min-height: 0;
+  overflow: auto;
+}
+
 .message-bubble {
   max-width: 92%;
   display: grid;
@@ -941,6 +1013,17 @@ button {
   justify-self: start;
   background: rgba(200, 161, 101, 0.22);
   color: #302b24;
+}
+
+.message-bubble--pending {
+  justify-self: start;
+  border: 1px dashed rgba(139, 111, 61, 0.36);
+  background: rgba(255, 255, 255, 0.34);
+  color: #7a6e58;
+}
+
+.message-bubble.is-unread {
+  box-shadow: 0 0 0 2px rgba(139, 111, 61, 0.16);
 }
 
 .message-bubble small {
@@ -980,6 +1063,36 @@ button {
   background: rgba(255, 255, 255, 0.62);
   color: #302b24;
   font: 13px/1.4 system-ui, sans-serif;
+}
+
+.margin-link-row {
+  display: grid;
+  grid-template-columns: minmax(0, 0.8fr) minmax(0, 1.2fr);
+  gap: 8px;
+}
+
+.margin-link-row label,
+.wake-summary p {
+  display: grid;
+  gap: 4px;
+  color: #7a6e58;
+  font: 700 11px/1.2 system-ui, sans-serif;
+}
+
+.margin-link-row select,
+.margin-search {
+  min-width: 0;
+  min-height: 34px;
+  padding: 8px 10px;
+  border: 1px solid rgba(58, 53, 48, 0.16);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.62);
+  color: #302b24;
+  font: 12px/1.2 system-ui, sans-serif;
+}
+
+.timeline-list--notes {
+  max-height: 260px;
 }
 
 .timeline-list {
@@ -1060,6 +1173,32 @@ button {
   display: grid;
 }
 
+.buzz-feed-panel {
+  grid-row: span 2;
+}
+
+.buzz-grid--feed {
+  max-height: 100%;
+  overflow: auto;
+}
+
+.buzz-card strong {
+  color: #f0ebdc;
+  font-size: 13px;
+}
+
+.buzz-card--event {
+  border-color: rgba(200, 161, 101, 0.35);
+}
+
+.buzz-card--npc {
+  border-color: rgba(129, 171, 149, 0.35);
+}
+
+.buzz-card--player {
+  border-color: rgba(166, 189, 214, 0.35);
+}
+
 .relationship-pill strong,
 .buzz-card small,
 .calendar-card small {
@@ -1076,6 +1215,119 @@ button {
   color: #d8cbb3;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.anthrop-lead-list {
+  display: grid;
+  gap: 8px;
+}
+
+.anthrop-lead {
+  display: grid;
+  gap: 5px;
+  padding: 8px 10px;
+  border: 1px solid rgba(240, 235, 220, 0.1);
+  border-radius: 6px;
+  background: rgba(240, 235, 220, 0.05);
+}
+
+.anthrop-lead small {
+  color: #c8a165;
+  font: 700 10px/1 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.anthrop-lead strong {
+  color: #f0ebdc;
+  font-size: 13px;
+}
+
+.anthrop-lead p {
+  margin: 0;
+}
+
+.anthrop-lead--high {
+  border-color: rgba(202, 111, 87, 0.45);
+}
+
+.anthrop-lead--medium {
+  border-color: rgba(200, 161, 101, 0.35);
+}
+
+.wake-app {
+  height: 100%;
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+  overflow: auto;
+  background: #1a1814;
+  color: #f0ebdc;
+  font-family: system-ui, sans-serif;
+}
+
+.wake-hero {
+  display: grid;
+  gap: 8px;
+  text-align: center;
+}
+
+.wake-hero h2,
+.wake-hero p,
+.wake-summary p {
+  margin: 0;
+}
+
+.wake-hero strong {
+  color: #c8a165;
+  font-size: 34px;
+}
+
+.wake-option-list {
+  display: grid;
+  gap: 8px;
+}
+
+.wake-option-list button {
+  display: grid;
+  gap: 3px;
+  padding: 9px 10px;
+  border: 1px solid rgba(240, 235, 220, 0.12);
+  border-radius: 6px;
+  background: rgba(240, 235, 220, 0.05);
+  color: #f0ebdc;
+  cursor: pointer;
+  text-align: left;
+}
+
+.wake-option-list button.is-selected {
+  border-color: rgba(200, 161, 101, 0.45);
+  background: rgba(200, 161, 101, 0.17);
+}
+
+.wake-option-list span {
+  font-weight: 800;
+}
+
+.wake-option-list small,
+.wake-summary p {
+  color: #d8cbb3;
+  font-size: 12px;
+}
+
+.wake-summary {
+  display: grid;
+  gap: 8px;
+}
+
+.wake-summary button {
+  min-height: 38px;
+  border: 1px solid rgba(200, 161, 101, 0.4);
+  border-radius: 6px;
+  background: rgba(200, 161, 101, 0.2);
+  color: #f0ebdc;
+  cursor: pointer;
+  font-weight: 800;
 }
 
 .spark-app {

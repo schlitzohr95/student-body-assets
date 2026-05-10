@@ -58,6 +58,10 @@ export function makeFreshState(): GameState {
     calendar: {
       seenReminderIds: [],
     },
+    wake: {
+      alarmSlot: timeChunk(8),
+      missedMorningBlocks: 0,
+    },
   };
 }
 
@@ -113,6 +117,14 @@ export function normalizeState(state: GameState): GameState {
     },
     calendar: {
       seenReminderIds: state.calendar?.seenReminderIds || [],
+    },
+    wake: {
+      alarmSlot: normalizeTimeSlot(state.wake?.alarmSlot ?? timeChunk(8), legacyTimeScale) as TimeSlotIndex,
+      lastSleepDay: state.wake?.lastSleepDay,
+      lastSleepSlot: typeof state.wake?.lastSleepSlot === "number" ? normalizeTimeSlot(state.wake.lastSleepSlot, legacyTimeScale) as TimeSlotIndex : undefined,
+      lastWakeDay: state.wake?.lastWakeDay,
+      lastWakeSlot: typeof state.wake?.lastWakeSlot === "number" ? normalizeTimeSlot(state.wake.lastWakeSlot, legacyTimeScale) as TimeSlotIndex : undefined,
+      missedMorningBlocks: state.wake?.missedMorningBlocks || 0,
     },
   };
 }

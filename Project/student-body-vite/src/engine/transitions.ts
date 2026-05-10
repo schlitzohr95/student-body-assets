@@ -1,4 +1,4 @@
-import type { Choice, GameMessage, GameNote, GameState, GameUpdate, LocationId, NpcId, StatKey } from "../types/game";
+import type { Choice, GameNote, GameState, GameUpdate, LocationId, NpcId, StatKey } from "../types/game";
 import { DEFAULT_ACTION_CHUNKS } from "../data/locations";
 import { STARTER_NPCS } from "../data/npcs";
 import { advanceTime, appendEvent } from "./state";
@@ -6,20 +6,16 @@ import { updateRoommateStudiousChemistry } from "./chemistry";
 import { addAcademicPrep } from "./academics";
 import { getLocationDirectory, maybeIssueCalendarReminder } from "./calendar";
 import { learnLocation, visitLocation } from "./locationKnowledge";
+import { deliverDuePulseReplies, outgoingPulseText, queuePulseMessage, type PulseTemplateId } from "./pulse";
 import { addSharedMoment, addSharedMomentForMany, getRelationshipFlag, updateRelationship } from "./relationships";
 import { getTravelPlan } from "./travel";
 
-const messageResponses: Record<string, string> = {
-  check_in: "Hey. Still alive over there?",
-  ask_about_day: "How's your day going?",
-  invite_coffee: "Want to grab coffee sometime this week?",
-};
-
 function withCalendarReminder(update: GameUpdate): GameUpdate {
-  const reminder = maybeIssueCalendarReminder(update.state);
+  const pulse = deliverDuePulseReplies(update.state);
+  const reminder = maybeIssueCalendarReminder(pulse.state);
   return {
     state: reminder.state,
-    notification: update.notification || reminder.notification,
+    notification: update.notification || pulse.notification || reminder.notification,
   };
 }
 
@@ -341,32 +337,15 @@ export function applyChoice(state: GameState, choice: Choice): GameUpdate {
   return withCalendarReminder({ state: chemistryUpdate.state, notification: chemistryUpdate.notification || notification });
 }
 
-export function sendPulseMessage(state: GameState, npcId: NpcId, templateId: keyof typeof messageResponses): GameUpdate {
+export function sendPulseMessage(state: GameState, npcId: NpcId, templateId: PulseTemplateId): GameUpdate {
   const npc = state.npcDirectory?.[npcId] || STARTER_NPCS[npcId];
-  const text = messageResponses[templateId] || messageResponses.check_in;
-  const outgoing: GameMessage = {
-    id: `${state.day}-${state.timeSlot}-${npcId}-${templateId}-out`,
-    day: state.day,
-    slot: state.timeSlot,
-    npcId,
-    direction: "outgoing",
-    text,
-    read: true,
-  };
-  const incoming: GameMessage = {
-    id: `${state.day}-${state.timeSlot}-${npcId}-${templateId}-in`,
-    day: state.day,
-    slot: state.timeSlot,
-    npcId,
-    direction: "incoming",
-    text: npc?.name === "Mari" ? "Not bad. Busy, but that's normal. You settling in okay?" : "Yeah, I'm around. What's up?",
-    read: false,
-  };
+  const queued = queuePulseMessage(state, npcId, templateId);
+  const text = outgoingPulseText(templateId);
 
   let next = appendEvent(
     {
       ...state,
-      messages: [...state.messages, outgoing, incoming],
+      messages: [...state.messages, ...queued.messages],
     },
     `Texted ${npc?.name || npcId}: ${text}`,
     [npcId],
@@ -392,11 +371,11 @@ export function sendPulseMessage(state: GameState, npcId: NpcId, templateId: key
 
   return {
     state: chemistryUpdate.state,
-    notification: chemistryUpdate.notification || { app: "Pulse", body: `${npc?.name || npcId} replied.` },
+    notification: chemistryUpdate.notification || { app: "Pulse", body: `Sent. Reply expected from ${queued.replyAt}.` },
   };
 }
 
-export function addMarginNote(state: GameState, text: string): GameUpdate {
+export function addMarginNote(state: GameState, text: string, links?: GameNote["links"]): GameUpdate {
   const trimmed = text.trim();
   if (!trimmed) return { state };
 
@@ -405,6 +384,8 @@ export function addMarginNote(state: GameState, text: string): GameUpdate {
     day: state.day,
     slot: state.timeSlot,
     text: trimmed,
+    links,
+    source: links?.category || "manual",
   };
 
   return {
