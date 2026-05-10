@@ -1,5 +1,4 @@
-import { LOCATIONS } from "../../data/locations";
-import { normalizeLocationMap } from "../../engine/worldPacks";
+import { getLocationDirectory, getNpcsAtLocation } from "../../engine/calendar";
 import type { GameState, LocationCategory, LocationId } from "../../types/game";
 
 interface CompassAppProps {
@@ -14,7 +13,7 @@ const groups: Array<{ label: string; cat: LocationCategory }> = [
 ];
 
 export function CompassApp({ state, onNavigate }: CompassAppProps) {
-  const locations = { ...LOCATIONS, ...normalizeLocationMap(state.world?.locations) };
+  const locations = getLocationDirectory(state);
 
   return (
     <div className="compass-app">
@@ -26,6 +25,8 @@ export function CompassApp({ state, onNavigate }: CompassAppProps) {
               .filter(location => location.cat === group.cat)
               .map(location => {
                 const isHere = location.id === state.location;
+                const npcNames = getNpcsAtLocation(state, location.id).slice(0, 2).map(npc => npc.name || npc.id);
+                const meta = isHere ? "here" : npcNames.length ? npcNames.join(", ") : "";
                 return (
                   <button
                     className={`location-button ${isHere ? "is-current" : ""}`}
@@ -35,7 +36,7 @@ export function CompassApp({ state, onNavigate }: CompassAppProps) {
                     onClick={() => onNavigate(location.id)}
                   >
                     <span>{location.label}</span>
-                    {isHere && <span>here</span>}
+                    {meta && <span className="location-button__meta">{meta}</span>}
                   </button>
                 );
               })}

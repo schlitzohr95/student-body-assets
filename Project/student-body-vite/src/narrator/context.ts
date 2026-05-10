@@ -1,7 +1,6 @@
 import { DAY_LABELS, formatTimeOfDay, LOCATIONS } from "../data/locations";
-import { STARTER_NPCS } from "../data/npcs";
-import { normalizeLocationMap } from "../engine/worldPacks";
 import { getChemistryObservationsForNpc } from "../engine/chemistry";
+import { getLocationDirectory, getNpcsAtLocation, getScheduledNpcDirectory } from "../engine/calendar";
 import type { GameEvent, GameState, LocationDefinition, Npc } from "../types/game";
 
 const NARRATOR_EVENT_LIMIT = 10;
@@ -13,31 +12,6 @@ const asArray = <T,>(value: T | T[] | null | undefined): T[] => {
 };
 
 const uniqueCompact = <T,>(values: Array<T | null | undefined | "">): T[] => [...new Set(values.filter(Boolean) as T[])];
-
-function getNpcDirectory(state: GameState): Record<string, Npc> {
-  const directory: Record<string, Npc> = { ...STARTER_NPCS, ...(state.npcDirectory || {}) };
-  const sources = [state.world?.npcs, state.world?.characters];
-
-  for (const source of sources) {
-    if (Array.isArray(source)) {
-      for (const npc of source) {
-        if (!npc || typeof npc !== "object") continue;
-        directory[npc.id] = { ...(directory[npc.id] || {}), ...npc };
-      }
-    } else if (source && typeof source === "object") {
-      Object.assign(directory, source);
-    }
-  }
-
-  return directory;
-}
-
-function getLocationDirectory(state: GameState): Record<string, LocationDefinition> {
-  return {
-    ...LOCATIONS,
-    ...normalizeLocationMap(state.world?.locations),
-  };
-}
 
 function getExplicitPresentNpcs(state: GameState, directory: Record<string, Npc>): Npc[] | null {
   const explicit = state.presentNpcIds || state.presentNpcs || state.scene?.presentNpcIds || state.scene?.npcsPresent || state.currentScene?.presentNpcIds || state.currentScene?.npcsPresent;
@@ -56,11 +30,9 @@ function getPresentNpcs(state: GameState, directory: Record<string, Npc>): Npc[]
   const explicitNpcs = getExplicitPresentNpcs(state, directory);
   if (explicitNpcs) return explicitNpcs;
 
-  const locatedNpcs = Object.values(directory).filter(npc => npc.currentLocation === state.location || npc.location === state.location);
+  const locatedNpcs = getNpcsAtLocation(state, state.location);
   if (locatedNpcs.length) return locatedNpcs;
 
-  if (state.location === "coffee_shop") return [directory.studious];
-  if (state.location === "dorm_room" && state.introSeen) return [directory.roommate];
   return [];
 }
 
@@ -145,7 +117,7 @@ export function buildNarratorContext(state: GameState, action?: string | { label
   const timeSlot = formatTimeOfDay(state.timeSlot);
   const locationDirectory = getLocationDirectory(state);
   const location = locationDirectory[state.location] || { id: state.location, label: state.location, cat: "campus", description: "No static description recorded yet." };
-  const npcDirectory = getNpcDirectory(state);
+  const npcDirectory = getScheduledNpcDirectory(state);
   const presentNpcs = getPresentNpcs(state, npcDirectory);
   const actionText = typeof action === "string" ? action.trim() : action?.label || action?.text || action?.description || "";
 

@@ -1,4 +1,5 @@
 import { LOCATIONS } from "../../data/locations";
+import { formatCalendarEventTime, getUpcomingCalendarEvents } from "../../engine/calendar";
 import type { GameState } from "../../types/game";
 import { eventSummary, formatMoment } from "../format";
 
@@ -19,6 +20,7 @@ export function BuzzApp({ state }: BuzzAppProps) {
   const offset = state.day % feedItems.length;
   const feed = [...feedItems.slice(offset), ...feedItems.slice(0, offset)].slice(0, 4);
   const recent = state.eventLog.slice(-4).reverse();
+  const upcoming = getUpcomingCalendarEvents(state, 96).slice(0, 3);
 
   return (
     <div className="buzz-app">
@@ -29,6 +31,12 @@ export function BuzzApp({ state }: BuzzAppProps) {
       <section className="phone-panel">
         <h2>Feed</h2>
         <div className="buzz-grid">
+          {upcoming.map(event => (
+            <article className="buzz-card" key={`${event.id}-${event.day}`}>
+              <small>{event.kind.toUpperCase()} · {formatCalendarEventTime(event)}</small>
+              <p>{event.title}</p>
+            </article>
+          ))}
           {feed.map((item, index) => (
             <article className="buzz-card" key={item}>
               <small>#{index + 1}</small>

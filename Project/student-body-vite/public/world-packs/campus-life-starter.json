@@ -161,6 +161,19 @@
       ]
     }
   },
+  "calendarEvents": [
+    {
+      "id": "zine_table_launch",
+      "title": "Zine Table Launch",
+      "kind": "social",
+      "day": 9,
+      "startSlot": 76,
+      "endSlot": 84,
+      "location": "student_union",
+      "description": "Sloane and a few other students table new zines in the Student Union.",
+      "npcIds": ["artistic"]
+    }
+  ],
   "arcs": [
     {
       "id": "first_floor_pressure",

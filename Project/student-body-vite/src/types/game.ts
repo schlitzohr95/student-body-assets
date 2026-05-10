@@ -5,6 +5,7 @@ export type LocationCategory = "campus" | "town" | "outdoor";
 export type LocationId = string;
 export type NpcId = string;
 export type NarratorSceneMode = "scripted" | "generated" | "generated_fallback";
+export type CalendarEventKind = "class" | "test" | "deadline" | "social" | "work" | "reminder";
 
 export interface PlayerStats extends Record<StatKey, number> {}
 
@@ -151,6 +152,35 @@ export interface AcademicsState {
   completedTests: Record<string, AcademicTestResult>;
 }
 
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  kind: CalendarEventKind;
+  day: number;
+  startSlot: number;
+  endSlot?: number;
+  location?: LocationId;
+  description?: string;
+  courseId?: string;
+  testId?: string;
+  npcIds?: NpcId[];
+  source?: string;
+}
+
+export interface CalendarState {
+  seenReminderIds: string[];
+}
+
+export interface NpcScheduleBlock {
+  start: string | number;
+  end?: string | number;
+  location: LocationId;
+  mood?: string;
+  label?: string;
+  days?: Array<string | number>;
+  source?: string;
+}
+
 export interface NpcSchema {
   ageBand?: string;
   publicFace?: string;
@@ -209,6 +239,10 @@ export interface WorldPack {
   places?: LocationDefinition[] | Record<LocationId, LocationDefinition>;
   schedules?: Record<string, unknown>;
   npcSchedules?: Record<NpcId, unknown>;
+  calendarEvents?: CalendarEvent[];
+  calendar?: CalendarEvent[] | { events?: CalendarEvent[] };
+  events?: CalendarEvent[];
+  deadlines?: CalendarEvent[];
   arcs?: unknown;
   storyArcs?: unknown;
   knownNpcIds?: NpcId[];
@@ -222,6 +256,7 @@ export interface GameWorldState {
   locations?: LocationDefinition[] | Record<LocationId, LocationDefinition>;
   schedules?: Record<string, unknown>;
   npcSchedules?: Record<NpcId, unknown>;
+  calendarEvents?: CalendarEvent[];
   arcs?: unknown;
   storyArcs?: unknown;
   packMeta?: WorldPackMeta[];
@@ -261,6 +296,7 @@ export interface GameState {
   notes: GameNote[];
   chemistry?: Record<string, ChemistryRecord>;
   academics?: AcademicsState;
+  calendar?: CalendarState;
   narrator?: NarratorSettings;
   npcDirectory?: Record<NpcId, Npc>;
   npcMoods?: Record<NpcId, string>;

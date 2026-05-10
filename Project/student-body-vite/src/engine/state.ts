@@ -32,6 +32,9 @@ export function makeFreshState(): GameState {
       prep: {},
       completedTests: {},
     },
+    calendar: {
+      seenReminderIds: [],
+    },
   };
 }
 
@@ -74,6 +77,9 @@ export function normalizeState(state: GameState): GameState {
     academics: {
       prep: state.academics?.prep || {},
       completedTests: state.academics?.completedTests || {},
+    },
+    calendar: {
+      seenReminderIds: state.calendar?.seenReminderIds || [],
     },
   };
 }

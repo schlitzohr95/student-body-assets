@@ -4,12 +4,21 @@ import { STARTER_NPCS } from "../data/npcs";
 import { advanceTime, appendEvent } from "./state";
 import { updateRoommateStudiousChemistry } from "./chemistry";
 import { addAcademicPrep } from "./academics";
+import { maybeIssueCalendarReminder } from "./calendar";
 
 const messageResponses: Record<string, string> = {
   check_in: "Hey. Still alive over there?",
   ask_about_day: "How's your day going?",
   invite_coffee: "Want to grab coffee sometime this week?",
 };
+
+function withCalendarReminder(update: GameUpdate): GameUpdate {
+  const reminder = maybeIssueCalendarReminder(update.state);
+  return {
+    state: reminder.state,
+    notification: update.notification || reminder.notification,
+  };
+}
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, value));
@@ -186,10 +195,10 @@ export function navigateToLocation(state: GameState, locationKey: LocationId): G
   const destination = LOCATIONS[locationKey]?.label || locationKey;
   const travelChunks = getTravelDurationChunks(state.location, locationKey);
   const next = advanceTime(appendEvent(state, `Walked to ${destination} (${formatDuration(travelChunks)})`), travelChunks);
-  return updateRoommateStudiousChemistry(
+  return withCalendarReminder(updateRoommateStudiousChemistry(
     { ...next, location: locationKey },
     { kind: "navigate", from: state.location, to: locationKey },
-  );
+  ));
 }
 
 export function applyChoice(state: GameState, choice: Choice): GameUpdate {
@@ -236,7 +245,7 @@ export function applyChoice(state: GameState, choice: Choice): GameUpdate {
   notification = activityUpdate.notification || notification;
 
   const chemistryUpdate = updateRoommateStudiousChemistry(next, { kind: "choice", choice });
-  return { state: chemistryUpdate.state, notification: chemistryUpdate.notification || notification };
+  return withCalendarReminder({ state: chemistryUpdate.state, notification: chemistryUpdate.notification || notification });
 }
 
 export function sendPulseMessage(state: GameState, npcId: NpcId, templateId: keyof typeof messageResponses): GameUpdate {

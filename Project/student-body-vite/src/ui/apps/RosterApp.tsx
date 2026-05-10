@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { portraitImageSrc } from "../../data/assets";
-import { STARTER_NPCS } from "../../data/npcs";
 import { getChemistryObservationsForNpc } from "../../engine/chemistry";
+import { getLocationDirectory, getScheduledNpcDirectory } from "../../engine/calendar";
 import type { GameState, Npc, NpcId, RelationshipRecord } from "../../types/game";
 
 interface RosterAppProps {
@@ -9,17 +9,7 @@ interface RosterAppProps {
 }
 
 function npcDirectory(state: GameState): Record<NpcId, Npc> {
-  const directory = { ...STARTER_NPCS, ...(state.npcDirectory || {}) };
-  for (const source of [state.world?.npcs, state.world?.characters]) {
-    if (Array.isArray(source)) {
-      for (const npc of source) {
-        if (npc?.id) directory[npc.id] = { ...(directory[npc.id] || {}), ...npc };
-      }
-    } else if (source && typeof source === "object") {
-      Object.assign(directory, source);
-    }
-  }
-  return directory;
+  return getScheduledNpcDirectory(state);
 }
 
 function relationshipRecord(state: GameState, npcId: NpcId): RelationshipRecord | number | string | undefined {
@@ -44,6 +34,7 @@ export function RosterApp({ state }: RosterAppProps) {
   const selectedRelationship = relationshipRecord(state, selectedNpc?.id || selectedNpcId);
   const observations = selectedNpc ? getChemistryObservationsForNpc(state, selectedNpc.id) : [];
   const chemistryRecords = Object.values(state.chemistry || {}).filter(record => selectedNpc && record.npcIds.includes(selectedNpc.id));
+  const locationDirectory = useMemo(() => getLocationDirectory(state), [state]);
 
   if (!knownNpcIds.length) {
     return <div className="empty-state">No saved contacts yet.</div>;
@@ -92,6 +83,9 @@ export function RosterApp({ state }: RosterAppProps) {
           </div>
 
           {selectedNpc.schema?.publicFace && <p>{String(selectedNpc.schema.publicFace)}</p>}
+          {(selectedNpc.currentLocation || selectedNpc.location) && (
+            <p><strong>Now:</strong> {locationDirectory[selectedNpc.currentLocation || selectedNpc.location || ""]?.label || selectedNpc.currentLocation || selectedNpc.location}</p>
+          )}
           {selectedNpc.schema?.voice && <p><strong>Voice:</strong> {String(selectedNpc.schema.voice)}</p>}
 
           <section className="roster-subsection">

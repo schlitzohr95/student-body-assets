@@ -222,7 +222,7 @@ export default function App() {
   }, [showNotification]);
 
   const handleImportWorldPack = useCallback((pack: WorldPack, sourceFileName?: string) => {
-    if (!state) return { name: "World pack", npcCount: 0, locationCount: 0, scheduleCount: 0, arcCount: 0 };
+    if (!state) return { name: "World pack", npcCount: 0, locationCount: 0, scheduleCount: 0, arcCount: 0, eventCount: 0 };
     const result = applyWorldPack(state, pack, sourceFileName);
     setState(normalizeState(result.state));
     showNotification({
@@ -295,6 +295,8 @@ export default function App() {
             setNotification(null);
             if (notification?.app === "Pulse") openApp("pulse");
             else if (notification?.app === "Buzz") openApp("buzz");
+            else if (notification?.app === "Spark") openApp("spark");
+            else if (notification?.app === "Anthrop") openApp("anthrop");
             else openPhoneHome();
           }}
         />

@@ -1,4 +1,5 @@
 import { LOCATIONS } from "../../data/locations";
+import { formatCalendarEventTime, getUpcomingCalendarEvents } from "../../engine/calendar";
 import type { GameState, StatKey } from "../../types/game";
 import { eventSummary, formatMoment } from "../format";
 
@@ -33,6 +34,7 @@ export function AnthropApp({ state }: AnthropAppProps) {
     .flatMap(record => record.revealedObservations)
     .slice(-3)
     .reverse();
+  const upcoming = getUpcomingCalendarEvents(state, 96).slice(0, 4);
 
   return (
     <div className="anthrop-app">
@@ -54,6 +56,23 @@ export function AnthropApp({ state }: AnthropAppProps) {
           <li>{state.player.resources.energy < 35 ? "Recover energy before stacking more demanding activities." : "You have enough energy for one serious activity."}</li>
           <li>{state.npcsKnown.length ? "Use Pulse to keep a contact warm between in-person scenes." : "Explore town or campus until you meet someone worth saving."}</li>
         </ul>
+      </section>
+
+      <section className="phone-panel anthrop-card">
+        <h2>Upcoming</h2>
+        {upcoming.length ? (
+          <div className="calendar-list">
+            {upcoming.map(event => (
+              <article className="calendar-card" key={`${event.id}-${event.day}-${event.startSlot}`}>
+                <small>{formatCalendarEventTime(event)}</small>
+                <strong>{event.title}</strong>
+                {event.description && <p>{event.description}</p>}
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="subtle-copy">Nothing pressing in the next day.</p>
+        )}
       </section>
 
       <section className="phone-panel anthrop-card">

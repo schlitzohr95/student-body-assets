@@ -1,4 +1,4 @@
-import type { GameState, LocationCategory, LocationDefinition, Npc, NpcId, WorldPack, WorldPackMeta } from "../types/game";
+import type { CalendarEvent, GameState, LocationCategory, LocationDefinition, Npc, NpcId, WorldPack, WorldPackMeta } from "../types/game";
 import { appendEvent } from "./state";
 
 const LOCATION_CATEGORIES = new Set<LocationCategory>(["campus", "town", "outdoor"]);
@@ -9,6 +9,7 @@ export interface WorldPackImportSummary {
   locationCount: number;
   scheduleCount: number;
   arcCount: number;
+  eventCount: number;
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -89,6 +90,29 @@ function arcCount(value: unknown) {
   return value == null ? 0 : 1;
 }
 
+function normalizeCalendarEvents(pack: WorldPack): CalendarEvent[] {
+  const calendar = Array.isArray(pack.calendar)
+    ? pack.calendar
+    : pack.calendar && typeof pack.calendar === "object" && Array.isArray(pack.calendar.events)
+      ? pack.calendar.events
+      : [];
+  const source = [
+    ...(Array.isArray(pack.calendarEvents) ? pack.calendarEvents : []),
+    ...calendar,
+    ...(Array.isArray(pack.events) ? pack.events : []),
+    ...(Array.isArray(pack.deadlines) ? pack.deadlines : []),
+  ];
+
+  return source.filter(event =>
+    event
+    && typeof event.id === "string"
+    && typeof event.title === "string"
+    && typeof event.kind === "string"
+    && typeof event.day === "number"
+    && typeof event.startSlot === "number",
+  );
+}
+
 function packMeta(pack: WorldPack, sourceFileName?: string): WorldPackMeta {
   return {
     id: stringValue(pack.id) || undefined,
@@ -113,6 +137,7 @@ export function summarizeWorldPack(pack: WorldPack, sourceFileName?: string): Wo
   };
   const schedules = { ...(pack.schedules || {}), ...(pack.npcSchedules || {}) };
   const arcs = pack.arcs ?? pack.storyArcs;
+  const calendarEvents = normalizeCalendarEvents(pack);
 
   return {
     name: packMeta(pack, sourceFileName).name || "Imported world pack",
@@ -120,6 +145,7 @@ export function summarizeWorldPack(pack: WorldPack, sourceFileName?: string): Wo
     locationCount: Object.keys(locations).length,
     scheduleCount: objectSize(schedules),
     arcCount: arcCount(arcs),
+    eventCount: calendarEvents.length,
   };
 }
 
@@ -135,6 +161,7 @@ export function applyWorldPack(state: GameState, pack: WorldPack, sourceFileName
   };
   const importedSchedules = { ...(pack.schedules || {}), ...(pack.npcSchedules || {}) };
   const importedArcs = pack.arcs ?? pack.storyArcs;
+  const importedCalendarEvents = normalizeCalendarEvents(pack);
   const meta = packMeta(pack, sourceFileName);
   const summary = summarizeWorldPack(pack, sourceFileName);
   const existingPackMeta = state.world?.packMeta || [];
@@ -167,6 +194,10 @@ export function applyWorldPack(state: GameState, pack: WorldPack, sourceFileName
         ...(state.world?.npcSchedules || {}),
         ...(pack.npcSchedules || {}),
       },
+      calendarEvents: [
+        ...(state.world?.calendarEvents || []).filter(event => !importedCalendarEvents.some(imported => imported.id === event.id)),
+        ...importedCalendarEvents,
+      ],
       arcs: importedArcs ?? state.world?.arcs,
       storyArcs: importedArcs ?? state.world?.storyArcs,
       packMeta: nextPackMeta,
@@ -176,7 +207,7 @@ export function applyWorldPack(state: GameState, pack: WorldPack, sourceFileName
   return {
     state: appendEvent(
       nextState,
-      `Imported world pack "${summary.name}" (${summary.npcCount} NPCs, ${summary.locationCount} locations, ${summary.scheduleCount} schedules, ${summary.arcCount} arcs).`,
+      `Imported world pack "${summary.name}" (${summary.npcCount} NPCs, ${summary.locationCount} locations, ${summary.scheduleCount} schedules, ${summary.eventCount} calendar events, ${summary.arcCount} arcs).`,
     ),
     summary,
   };

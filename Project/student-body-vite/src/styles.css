@@ -417,6 +417,16 @@ button {
   white-space: nowrap;
 }
 
+.location-button__meta {
+  max-width: 46%;
+  flex: 0 1 auto;
+  color: #c8a165;
+  overflow: hidden;
+  text-align: right;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .location-button.is-current {
   border-color: rgba(200, 161, 101, 0.4);
   background: rgba(200, 161, 101, 0.18);
@@ -802,13 +812,15 @@ button {
 }
 
 .relationship-grid,
-.buzz-grid {
+.buzz-grid,
+.calendar-list {
   display: grid;
   gap: 8px;
 }
 
 .relationship-pill,
-.buzz-card {
+.buzz-card,
+.calendar-card {
   display: flex;
   justify-content: space-between;
   gap: 10px;
@@ -818,13 +830,27 @@ button {
   background: rgba(240, 235, 220, 0.05);
 }
 
-.buzz-card {
+.buzz-card,
+.calendar-card {
   display: grid;
 }
 
 .relationship-pill strong,
-.buzz-card small {
+.buzz-card small,
+.calendar-card small {
   color: #c8a165;
+}
+
+.calendar-card strong {
+  color: #f0ebdc;
+  font-size: 13px;
+}
+
+.calendar-card p {
+  margin: 0;
+  color: #d8cbb3;
+  font-size: 12px;
+  line-height: 1.35;
 }
 
 .spark-app {
