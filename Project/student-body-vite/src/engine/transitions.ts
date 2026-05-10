@@ -2,6 +2,7 @@ import type { Choice, GameMessage, GameNote, GameState, GameUpdate, LocationId, 
 import { DEFAULT_ACTION_CHUNKS, formatDuration, LOCATIONS } from "../data/locations";
 import { STARTER_NPCS } from "../data/npcs";
 import { advanceTime, appendEvent } from "./state";
+import { updateRoommateStudiousChemistry } from "./chemistry";
 
 const messageResponses: Record<string, string> = {
   check_in: "Hey. Still alive over there?",
@@ -180,7 +181,10 @@ export function navigateToLocation(state: GameState, locationKey: LocationId): G
   const destination = LOCATIONS[locationKey]?.label || locationKey;
   const travelChunks = getTravelDurationChunks(state.location, locationKey);
   const next = advanceTime(appendEvent(state, `Walked to ${destination} (${formatDuration(travelChunks)})`), travelChunks);
-  return { state: { ...next, location: locationKey } };
+  return updateRoommateStudiousChemistry(
+    { ...next, location: locationKey },
+    { kind: "navigate", from: state.location, to: locationKey },
+  );
 }
 
 export function applyChoice(state: GameState, choice: Choice): GameUpdate {
@@ -226,7 +230,8 @@ export function applyChoice(state: GameState, choice: Choice): GameUpdate {
   next = activityUpdate.state;
   notification = activityUpdate.notification || notification;
 
-  return { state: next, notification };
+  const chemistryUpdate = updateRoommateStudiousChemistry(next, { kind: "choice", choice });
+  return { state: chemistryUpdate.state, notification: chemistryUpdate.notification || notification };
 }
 
 export function sendPulseMessage(state: GameState, npcId: NpcId, templateId: keyof typeof messageResponses): GameUpdate {
@@ -260,10 +265,11 @@ export function sendPulseMessage(state: GameState, npcId: NpcId, templateId: key
     [npcId],
   );
   next = changeRelationship(next, npcId, templateId === "invite_coffee" ? 2 : 1, "texting");
+  const chemistryUpdate = updateRoommateStudiousChemistry(next, { kind: "pulse", npcId, templateId });
 
   return {
-    state: next,
-    notification: { app: "Pulse", body: `${npc?.name || npcId} replied.` },
+    state: chemistryUpdate.state,
+    notification: chemistryUpdate.notification || { app: "Pulse", body: `${npc?.name || npcId} replied.` },
   };
 }
 

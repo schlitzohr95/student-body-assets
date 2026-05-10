@@ -29,6 +29,10 @@ export function AnthropApp({ state }: AnthropAppProps) {
   const strong = strongestStat(state);
   const recentEvents = state.eventLog.slice(-5).reverse();
   const relationshipEntries = Object.entries(state.player.relationships || {});
+  const socialObservations = Object.values(state.chemistry || {})
+    .flatMap(record => record.revealedObservations)
+    .slice(-3)
+    .reverse();
 
   return (
     <div className="anthrop-app">
@@ -65,6 +69,19 @@ export function AnthropApp({ state }: AnthropAppProps) {
           </div>
         ) : (
           <p className="subtle-copy">No relationship records yet.</p>
+        )}
+      </section>
+
+      <section className="phone-panel anthrop-card">
+        <h2>Social Signals</h2>
+        {socialObservations.length ? (
+          <ul>
+            {socialObservations.map(observation => (
+              <li key={observation.id}>{observation.label}: {observation.text}</li>
+            ))}
+          </ul>
+        ) : (
+          <p className="subtle-copy">No gated observations surfaced yet.</p>
         )}
       </section>
 

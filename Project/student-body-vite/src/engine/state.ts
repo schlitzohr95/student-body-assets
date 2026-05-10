@@ -23,10 +23,11 @@ export function makeFreshState(): GameState {
       endpoint: "http://127.0.0.1:8787/narrate",
       model: "",
     },
-    npcsKnown: [],
+    npcsKnown: ["roommate"],
     eventLog: [],
     messages: [],
     notes: [],
+    chemistry: {},
   };
 }
 
@@ -61,10 +62,11 @@ export function normalizeState(state: GameState): GameState {
       endpoint: state.narrator?.endpoint || "http://127.0.0.1:8787/narrate",
       model: state.narrator?.model || "",
     },
-    npcsKnown: state.npcsKnown || [],
+    npcsKnown: [...new Set(["roommate", ...(state.npcsKnown || [])])],
     eventLog: migrateTimedRecords(state.eventLog, legacyTimeScale),
     messages: migrateTimedRecords(state.messages, legacyTimeScale),
     notes: migrateTimedRecords(state.notes, legacyTimeScale),
+    chemistry: state.chemistry || {},
   };
 }
 

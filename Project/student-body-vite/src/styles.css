@@ -460,6 +460,154 @@ button {
   font-size: 12px;
 }
 
+.roster-app {
+  height: 100%;
+  display: grid;
+  grid-template-rows: minmax(120px, 0.42fr) minmax(0, 1fr);
+  gap: 10px;
+  padding: 12px;
+  overflow: hidden;
+  background: #1a1814;
+  color: #f0ebdc;
+  font-family: system-ui, sans-serif;
+}
+
+.roster-app .roster-list {
+  height: auto;
+  min-height: 0;
+  padding: 0;
+  overflow: auto;
+}
+
+.roster-app .roster-card {
+  width: 100%;
+  border-color: rgba(240, 235, 220, 0.1);
+  background: rgba(240, 235, 220, 0.04);
+  color: #f0ebdc;
+  cursor: pointer;
+  text-align: left;
+}
+
+.roster-app .roster-card.is-selected {
+  border-color: rgba(200, 161, 101, 0.45);
+  background: rgba(200, 161, 101, 0.15);
+}
+
+.roster-app .roster-card div {
+  min-width: 0;
+  flex: 1;
+}
+
+.roster-app .roster-card h2,
+.roster-detail h2,
+.roster-subsection h3 {
+  color: #f0ebdc;
+}
+
+.roster-app .roster-card p,
+.roster-detail p {
+  color: #d8cbb3;
+}
+
+.roster-app .roster-card strong {
+  color: #c8a165;
+  font-size: 13px;
+}
+
+.roster-detail {
+  display: grid;
+  align-content: start;
+  gap: 10px;
+  overflow: auto;
+}
+
+.roster-detail header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.roster-detail h2,
+.roster-detail p,
+.roster-subsection h3,
+.observation-card p {
+  margin: 0;
+}
+
+.roster-detail__portrait {
+  width: 58px;
+  height: 58px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+}
+
+.roster-detail__stats {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 6px 12px;
+  padding: 8px;
+  border: 1px solid rgba(240, 235, 220, 0.1);
+  border-radius: 6px;
+  background: rgba(240, 235, 220, 0.05);
+  font-size: 12px;
+}
+
+.roster-detail__stats span,
+.observation-card small {
+  color: #a89878;
+}
+
+.roster-detail__stats strong {
+  color: #c8a165;
+}
+
+.roster-subsection {
+  display: grid;
+  gap: 8px;
+}
+
+.roster-subsection h3 {
+  color: #c8a165;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.observation-list,
+.chemistry-list {
+  display: grid;
+  gap: 8px;
+}
+
+.observation-card {
+  display: grid;
+  gap: 5px;
+  padding: 8px;
+  border: 1px solid rgba(200, 161, 101, 0.2);
+  border-radius: 6px;
+  background: rgba(200, 161, 101, 0.08);
+}
+
+.observation-card strong,
+.chemistry-pill strong {
+  color: #c8a165;
+}
+
+.observation-card p {
+  line-height: 1.4;
+}
+
+.chemistry-pill {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 7px 8px;
+  border: 1px solid rgba(240, 235, 220, 0.1);
+  border-radius: 6px;
+  background: rgba(240, 235, 220, 0.05);
+  font-size: 12px;
+}
+
 .stat-row {
   display: grid;
   gap: 4px;

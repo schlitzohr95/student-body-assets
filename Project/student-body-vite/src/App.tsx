@@ -112,11 +112,13 @@ export default function App() {
   const handleNavigate = useCallback((location: LocationId) => {
     setState(current => {
       if (!current) return current;
-      return navigateToLocation(current, location).state;
+      const update = navigateToLocation(current, location);
+      if (update.notification) window.setTimeout(() => showNotification(update.notification!), 250);
+      return update.state;
     });
     setGeneratedScene(null);
     setPhone({ open: false, view: "home", orientation: "portrait" });
-  }, []);
+  }, [showNotification]);
 
   const handleChoice = useCallback(async (choice: Choice) => {
     if (!state || generatingScene) return;

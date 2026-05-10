@@ -70,6 +70,27 @@ export interface GameNote {
   text: string;
 }
 
+export interface ChemistryObservation {
+  id: string;
+  pairId: string;
+  day: number;
+  slot: number;
+  label: string;
+  text: string;
+  sensitivityGate: number;
+  trigger?: string;
+}
+
+export interface ChemistryRecord {
+  id: string;
+  npcIds: NpcId[];
+  score: number;
+  hiddenFlags: Record<string, unknown>;
+  revealedObservations: ChemistryObservation[];
+  lastUpdatedDay?: number;
+  lastUpdatedSlot?: number;
+}
+
 export interface NpcSchema {
   ageBand?: string;
   publicFace?: string;
@@ -178,6 +199,7 @@ export interface GameState {
   eventLog: GameEvent[];
   messages: GameMessage[];
   notes: GameNote[];
+  chemistry?: Record<string, ChemistryRecord>;
   narrator?: NarratorSettings;
   npcDirectory?: Record<NpcId, Npc>;
   npcMoods?: Record<NpcId, string>;

@@ -1,6 +1,7 @@
 import { DAY_LABELS, formatTimeOfDay, LOCATIONS } from "../data/locations";
 import { STARTER_NPCS } from "../data/npcs";
 import { normalizeLocationMap } from "../engine/worldPacks";
+import { getChemistryObservationsForNpc } from "../engine/chemistry";
 import type { GameEvent, GameState, LocationDefinition, Npc } from "../types/game";
 
 const NARRATOR_EVENT_LIMIT = 10;
@@ -191,6 +192,13 @@ export function buildNarratorContext(state: GameState, action?: string | { label
     : presentNpcs.length
       ? "- none recorded that were witnessed by the present NPCs"
       : "- none included; no NPCs are currently present";
+  const visibleObservations = presentNpcs
+    .flatMap(npc => getChemistryObservationsForNpc(state, npc.id))
+    .filter((observation, index, all) => all.findIndex(item => item.id === observation.id) === index)
+    .slice(0, 5);
+  const observationText = visibleObservations.length
+    ? visibleObservations.map(observation => `- ${observation.label}: ${observation.text}`).join("\n")
+    : "- none revealed for the present NPCs";
 
   return [
     "# Scene",
@@ -208,5 +216,8 @@ export function buildNarratorContext(state: GameState, action?: string | { label
     "",
     `# Recent Relevant Event Log (filtered to events witnessed by present NPCs, max ${NARRATOR_EVENT_LIMIT})`,
     recentEventText,
+    "",
+    "# Player-Visible Social Observations",
+    observationText,
   ].join("\n");
 }
