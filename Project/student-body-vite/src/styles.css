@@ -319,6 +319,7 @@ button {
 }
 
 .phone-app-button {
+  position: relative;
   min-height: 78px;
   display: grid;
   justify-items: center;
@@ -341,6 +342,21 @@ button {
   width: 42px;
   height: 42px;
   border-radius: 10px;
+}
+
+.phone-app-button__badge {
+  position: absolute;
+  top: 2px;
+  right: 4px;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #c8a165;
+  color: #1a1814;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  text-transform: uppercase;
 }
 
 .compass-app {
@@ -395,10 +411,11 @@ button {
 .location-button {
   width: 100%;
   min-height: 38px;
-  display: flex;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  justify-content: space-between;
-  gap: 10px;
+  column-gap: 10px;
+  row-gap: 4px;
   padding: 8px 10px;
   border: 1px solid rgba(240, 235, 220, 0.08);
   border-radius: 6px;
@@ -410,21 +427,53 @@ button {
   text-align: left;
 }
 
-.location-button span:first-child {
+.location-button__main {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.location-button__name {
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.location-button__tag {
+  flex: 0 0 auto;
+  padding: 2px 5px;
+  border-radius: 999px;
+  background: #c8a165;
+  color: #1a1814;
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+  line-height: 1;
+  text-transform: uppercase;
+}
+
 .location-button__meta {
-  max-width: 46%;
-  flex: 0 1 auto;
+  max-width: 120px;
   color: #c8a165;
   overflow: hidden;
+  justify-self: end;
   text-align: right;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.location-button__hours {
+  grid-column: 1 / -1;
+  color: rgba(240, 235, 220, 0.62);
+  font-size: 10px;
+  line-height: 1.2;
+}
+
+.location-button__hours.is-unknown {
+  color: rgba(240, 235, 220, 0.42);
+  font-style: italic;
 }
 
 .location-button.is-current {

@@ -5,6 +5,7 @@ import { advanceTime, appendEvent } from "./state";
 import { updateRoommateStudiousChemistry } from "./chemistry";
 import { addAcademicPrep } from "./academics";
 import { maybeIssueCalendarReminder } from "./calendar";
+import { learnLocation, visitLocation } from "./locationKnowledge";
 
 const messageResponses: Record<string, string> = {
   check_in: "Hey. Still alive over there?",
@@ -196,7 +197,7 @@ export function navigateToLocation(state: GameState, locationKey: LocationId): G
   const travelChunks = getTravelDurationChunks(state.location, locationKey);
   const next = advanceTime(appendEvent(state, `Walked to ${destination} (${formatDuration(travelChunks)})`), travelChunks);
   return withCalendarReminder(updateRoommateStudiousChemistry(
-    { ...next, location: locationKey },
+    visitLocation({ ...next, location: locationKey }, locationKey),
     { kind: "navigate", from: state.location, to: locationKey },
   ));
 }
@@ -205,7 +206,9 @@ export function applyChoice(state: GameState, choice: Choice): GameUpdate {
   let next = advanceTime(appendEvent(state, `Chose: ${choice.label}`), getChoiceDurationChunks(choice));
   let notification: GameUpdate["notification"];
 
-  if (choice.tag === "intro_complete") next = { ...next, introSeen: true };
+  if (choice.tag === "intro_complete") {
+    next = learnLocation({ ...next, introSeen: true }, "coffee_shop", "Marcus's fridge note", "rumored");
+  }
 
   if (choice.tag === "met_mari" || choice.tag === "met_mari_quiet") {
     next = appendEvent(next, "Met Mari at the coffee shop.", ["studious"]);
@@ -224,8 +227,8 @@ export function applyChoice(state: GameState, choice: Choice): GameUpdate {
     notification = { app: "Pulse", body: "Mari saved your number." };
   }
 
-  if (choice.id === "go_coffee") next = { ...next, location: "coffee_shop" };
-  if (choice.id === "explore") next = { ...next, location: "quad" };
+  if (choice.id === "go_coffee") next = visitLocation({ ...next, location: "coffee_shop" }, "coffee_shop");
+  if (choice.id === "explore") next = visitLocation({ ...next, location: "quad" }, "quad");
 
   if (choice.id === "rest" || choice.id === "wait") {
     next = {

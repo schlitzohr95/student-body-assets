@@ -213,6 +213,20 @@ export interface LocationDefinition {
   label: string;
   cat: LocationCategory;
   description: string;
+  hours?: string;
+  initiallyKnown?: boolean;
+  hiddenUntilDiscovered?: boolean;
+}
+
+export type LocationDiscoveryState = "unknown" | "rumored" | "known" | "visited";
+
+export interface LocationKnowledgeRecord {
+  state: LocationDiscoveryState;
+  discoveredDay?: number;
+  discoveredSlot?: TimeSlotIndex;
+  source?: string;
+  isNew?: boolean;
+  hoursKnown?: boolean;
 }
 
 export interface WorldPackMeta {
@@ -291,6 +305,7 @@ export interface GameState {
   metMari: boolean;
   player: PlayerState;
   npcsKnown: string[];
+  locationKnowledge?: Record<LocationId, LocationKnowledgeRecord>;
   eventLog: GameEvent[];
   messages: GameMessage[];
   notes: GameNote[];

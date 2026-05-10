@@ -1,5 +1,6 @@
 import type { GameEvent, GameState, TimeSlotIndex } from "../types/game";
 import { CHUNKS_PER_DAY, DEFAULT_ACTION_CHUNKS, normalizeTimeSlot, timeChunk } from "../data/locations";
+import { makeInitialLocationKnowledge, normalizeLocationKnowledge } from "./locationKnowledge";
 
 export function makeFreshState(): GameState {
   return {
@@ -24,6 +25,7 @@ export function makeFreshState(): GameState {
       model: "",
     },
     npcsKnown: ["roommate"],
+    locationKnowledge: makeInitialLocationKnowledge(),
     eventLog: [],
     messages: [],
     notes: [],
@@ -70,6 +72,7 @@ export function normalizeState(state: GameState): GameState {
       model: state.narrator?.model || "",
     },
     npcsKnown: [...new Set(["roommate", ...(state.npcsKnown || [])])],
+    locationKnowledge: normalizeLocationKnowledge(state),
     eventLog: migrateTimedRecords(state.eventLog, legacyTimeScale),
     messages: migrateTimedRecords(state.messages, legacyTimeScale),
     notes: migrateTimedRecords(state.notes, legacyTimeScale),

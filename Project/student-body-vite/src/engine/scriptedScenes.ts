@@ -7,7 +7,7 @@ export function getScriptedScene(state: GameState): Scene {
   if (location === "dorm_room" && !introSeen) {
     return {
       narration:
-        "First morning. The boxes you didn't unpack last night are still where you left them. Your roommate Marcus is gone. There's a note on the fridge in handwriting that's somehow already familiar: \"coffee shop down the street is good. back by noon.\" The room is too quiet.",
+        "First morning. The boxes you didn't unpack last night are still where you left them. Your roommate Marcus is gone. There's a note on the fridge in handwriting that's somehow already familiar: \"coffee shop down the street is good. back by noon.\" Under it, Marcus has drawn a tiny map, and Compass has a new town pin waiting. The room is too quiet.",
       choices: [
         { id: "go_coffee", label: "Head to the coffee shop", tag: "intro_complete" },
         { id: "unpack", label: "Stay in and unpack", tag: "intro_complete" },

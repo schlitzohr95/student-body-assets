@@ -119,6 +119,8 @@ export const LOCATIONS: Record<LocationId, LocationDefinition> = {
     label: "Coffee Shop",
     cat: "town",
     description: "A warm independent shop off campus, all old wood, espresso hiss, and regulars with routines.",
+    hours: "Daily 7:00 AM-6:00 PM",
+    hiddenUntilDiscovered: true,
   },
   bar: {
     id: "bar",

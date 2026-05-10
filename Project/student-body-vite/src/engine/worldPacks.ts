@@ -56,11 +56,17 @@ export function normalizeLocationMap(source: unknown): Record<string, LocationDe
     if (!isRecord(value)) return;
     const id = stringValue(value.id, key);
     if (!id) return;
+    const hours = stringValue(value.hours);
+    const initiallyKnown = typeof value.initiallyKnown === "boolean" ? value.initiallyKnown : undefined;
+    const hiddenUntilDiscovered = typeof value.hiddenUntilDiscovered === "boolean" ? value.hiddenUntilDiscovered : undefined;
     next[id] = {
       id,
       label: stringValue(value.label, stringValue(value.name, id)),
       cat: normalizeLocationCategory(value.cat || value.category),
       description: stringValue(value.description, stringValue(value.brief, stringValue(value.summary, "No authored description recorded yet."))),
+      ...(hours ? { hours } : {}),
+      ...(typeof initiallyKnown === "boolean" ? { initiallyKnown } : {}),
+      ...(typeof hiddenUntilDiscovered === "boolean" ? { hiddenUntilDiscovered } : {}),
     };
   };
 
