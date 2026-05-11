@@ -183,10 +183,46 @@ button {
 }
 
 .dialogue-strip__text {
+  display: grid;
+  align-content: start;
+  gap: 10px;
   overflow: auto;
   color: #f0ebdc;
+  padding-right: 6px;
+}
+
+.dialogue-turn {
+  display: grid;
+  gap: 4px;
+  max-width: min(760px, 88%);
+  padding: 9px 11px;
+  border: 1px solid rgba(212, 196, 168, 0.14);
+  border-radius: 8px;
+  background: rgba(240, 235, 220, 0.05);
+}
+
+.dialogue-turn--player {
+  justify-self: end;
+  border-color: rgba(200, 161, 101, 0.28);
+  background: rgba(200, 161, 101, 0.12);
+}
+
+.dialogue-turn--current {
+  border-color: rgba(212, 196, 168, 0.22);
+}
+
+.dialogue-turn__speaker {
+  color: #c8a165;
+  font: 800 10px/1 system-ui, sans-serif;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.dialogue-turn p {
+  margin: 0;
+  color: #f0ebdc;
   font-size: 15px;
-  line-height: 1.55;
+  line-height: 1.5;
 }
 
 .choice-row {

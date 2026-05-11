@@ -1,4 +1,4 @@
-import type { GameEvent, GameState, TimeSlotIndex } from "../types/game";
+import type { DialogueTurn, GameEvent, GameState, TimeSlotIndex } from "../types/game";
 import { CHUNKS_PER_DAY, DEFAULT_ACTION_CHUNKS, normalizeTimeSlot, timeChunk } from "../data/locations";
 import { makeInitialLocationKnowledge, normalizeLocationKnowledge } from "./locationKnowledge";
 import { normalizeRelationships } from "./relationships";
@@ -48,6 +48,7 @@ export function makeFreshState(): GameState {
     npcsKnown: ["roommate"],
     locationKnowledge: makeInitialLocationKnowledge(),
     eventLog: [],
+    dialogueLog: [],
     messages: [],
     notes: [],
     chemistry: {},
@@ -72,6 +73,22 @@ function migrateTimedRecords<T extends { slot?: number | string }>(records: T[] 
     if (!record || typeof record.slot !== "number") return record;
     return { ...record, slot: normalizeTimeSlot(record.slot, legacyScale) };
   });
+}
+
+function normalizeDialogueLog(records: DialogueTurn[] | undefined, legacyScale: boolean): DialogueTurn[] {
+  if (!Array.isArray(records)) return [];
+  return records
+    .filter(turn => turn && typeof turn.text === "string" && turn.text.trim())
+    .map((turn, index) => ({
+      ...turn,
+      id: turn.id || `dialogue-${turn.day || 0}-${turn.slot || 0}-${index}`,
+      day: typeof turn.day === "number" ? turn.day : 1,
+      slot: normalizeTimeSlot(turn.slot, legacyScale) as TimeSlotIndex,
+      speaker: turn.speaker || "narrator",
+      label: turn.label || (turn.speaker === "player" ? "You" : "Narrator"),
+      text: turn.text.trim(),
+    }))
+    .slice(-18);
 }
 
 export function normalizeState(state: GameState): GameState {
@@ -109,6 +126,7 @@ export function normalizeState(state: GameState): GameState {
     npcsKnown: [...new Set(["roommate", ...(state.npcsKnown || [])])],
     locationKnowledge: normalizeLocationKnowledge(state),
     eventLog: migrateTimedRecords(state.eventLog, legacyTimeScale),
+    dialogueLog: normalizeDialogueLog(state.dialogueLog, legacyTimeScale),
     messages: migrateTimedRecords(state.messages, legacyTimeScale),
     notes: migrateTimedRecords(state.notes, legacyTimeScale),
     chemistry: state.chemistry || {},

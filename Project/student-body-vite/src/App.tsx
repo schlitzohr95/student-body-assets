@@ -7,6 +7,7 @@ import { applyWorldPack } from "./engine/worldPacks";
 import { submitAcademicTest } from "./engine/academics";
 import { purchaseItem } from "./engine/economy";
 import { maybeIssueCalendarReminder } from "./engine/calendar";
+import { appendChoiceTranscript, appendNavigationArrivalTurn, scriptedResponseForChoice } from "./engine/dialogue";
 import { deliverDuePulseReplies, markPulseThreadRead, type PulseTemplateId } from "./engine/pulse";
 import { sleepUntilAlarm } from "./engine/wake";
 import { applyNarratorStatePatch } from "./narrator/patch";
@@ -121,7 +122,7 @@ export default function App() {
       if (!current) return current;
       const update = navigateToLocation(current, location);
       if (update.notification) window.setTimeout(() => showNotification(update.notification!), 250);
-      return update.state;
+      return appendNavigationArrivalTurn(current, update.state, location);
     });
     setGeneratedScene(null);
     setPhone({ open: false, view: "home", orientation: "portrait" });
@@ -132,10 +133,17 @@ export default function App() {
     const settings = { ...DEFAULT_NARRATOR_SETTINGS, ...(state.narrator || {}) };
     const update = applyChoice(state, choice);
     const shouldGenerate = settings.mode !== "scripted";
+    const scriptedState = () => appendChoiceTranscript(
+      state,
+      update.state,
+      choice,
+      scriptedResponseForChoice(state, choice, update.state),
+      "scripted",
+    );
 
     if (!shouldGenerate) {
       setGeneratedScene(null);
-      setState(update.state);
+      setState(scriptedState());
       if (update.notification) window.setTimeout(() => showNotification(update.notification!), 600);
       return;
     }
@@ -148,7 +156,7 @@ export default function App() {
 
     if (provider.type === "http" && !provider.model) {
       setGeneratedScene(null);
-      setState(update.state);
+      setState(scriptedState());
       showNotification({ app: "Beacon", body: "Select a narrator model before enabling generated scenes." });
       return;
     }
@@ -160,7 +168,7 @@ export default function App() {
 
       if (!validation.ok) {
         setGeneratedScene(null);
-        setState(update.state);
+        setState(scriptedState());
         showNotification({ app: "Beacon", body: `Generated scene rejected: ${validation.summary}.` });
         return;
       }
@@ -171,11 +179,11 @@ export default function App() {
         narration: result.parsed.narration,
         choices: result.parsed.choices.length ? result.parsed.choices : fallbackChoices,
       });
-      setState(patchedState);
+      setState(appendChoiceTranscript(state, patchedState, choice, result.parsed.narration, "generated"));
       if (update.notification) window.setTimeout(() => showNotification(update.notification!), 600);
     } catch (caught) {
       setGeneratedScene(null);
-      setState(update.state);
+      setState(scriptedState());
       showNotification({
         app: "Beacon",
         body: caught instanceof Error ? `Generated scene failed: ${caught.message}` : "Generated scene failed; scripted scene used.",
@@ -375,7 +383,7 @@ export default function App() {
           </div>
         )}
       </section>
-      <DialogueStrip scene={scene} onChoice={handleChoice} busy={generatingScene} />
+      <DialogueStrip scene={scene} dialogueLog={state.dialogueLog} onChoice={handleChoice} busy={generatingScene} />
     </main>
   );
 }

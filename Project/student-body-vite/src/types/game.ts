@@ -410,6 +410,20 @@ export interface Scene {
   choices: Choice[];
 }
 
+export type DialogueTurnSpeaker = "player" | "narrator" | "npc";
+export type DialogueTurnSource = "scene" | "choice" | "scripted" | "generated" | "navigation" | "fallback";
+
+export interface DialogueTurn {
+  id: string;
+  day: number;
+  slot: TimeSlotIndex;
+  speaker: DialogueTurnSpeaker;
+  label: string;
+  text: string;
+  source?: DialogueTurnSource;
+  npcId?: NpcId;
+}
+
 export interface NarratorSettings {
   mode: NarratorSceneMode;
   providerType: "mock" | "window" | "http";
@@ -429,6 +443,7 @@ export interface GameState {
   npcsKnown: string[];
   locationKnowledge?: Record<LocationId, LocationKnowledgeRecord>;
   eventLog: GameEvent[];
+  dialogueLog: DialogueTurn[];
   messages: GameMessage[];
   notes: GameNote[];
   chemistry?: Record<string, ChemistryRecord>;
