@@ -6,10 +6,26 @@ import {
   type NarratorProviderType,
   type NarratorRunResult,
 } from "../../narrator/client";
+import { ACADEMIC_COURSES, ACADEMIC_TESTS } from "../../data/academics";
+import { formatTimeOfDay, LOCATIONS } from "../../data/locations";
+import { STARTER_NPCS } from "../../data/npcs";
+import { makeFreshState } from "../../engine/state";
 import { buildNarratorContext } from "../../narrator/context";
 import { BENCH_SCENARIOS, makeBenchResult, type NarratorBenchResult } from "../../narrator/testBench";
 import { buildWorldPackFromState, normalizeLocationMap, normalizeNpcMap, summarizeWorldPack, worldPackErrorMessage, type WorldPackImportSummary } from "../../engine/worldPacks";
 import { exportJsonFile, readJsonFile } from "../../services/jsonFiles";
+import {
+  SAVE_SLOT_IDS,
+  clearSaveSlot,
+  createStateBackup,
+  listSaveSlots,
+  listStateBackups,
+  loadStateBackup,
+  loadStateFromSlot,
+  saveStateToSlot,
+  type SaveSlotId,
+  type SaveSlotMeta,
+} from "../../services/storage";
 import { fetchWorldPack, fetchWorldPackCatalog, type WorldPackCatalogEntry } from "../../services/worldPackCatalog";
 import type { GameState, NarratorSceneMode, NarratorSettings, WorldPack } from "../../types/game";
 
@@ -28,9 +44,28 @@ interface NarratorLabAppProps {
   onApplyResult: (result: NarratorRunResult, action: string) => void;
   narratorSettings: NarratorSettings;
   onNarratorSettingsChange: (settings: Partial<NarratorSettings>) => void;
-  onImportState: (state: GameState) => void;
+  onImportState: (state: GameState, notificationBody?: string) => void;
   onImportWorldPack: (pack: WorldPack, sourceFileName?: string) => WorldPackImportSummary;
 }
+
+type StateInspectorFilter = "full" | "player" | "relationships" | "world" | "cast" | "academics" | "calendar" | "phone" | "logs";
+
+const STATE_INSPECTOR_FILTERS: Array<{ id: StateInspectorFilter; label: string }> = [
+  { id: "full", label: "Full state" },
+  { id: "player", label: "Player" },
+  { id: "relationships", label: "Relationships" },
+  { id: "world", label: "World pack" },
+  { id: "cast", label: "Cast" },
+  { id: "academics", label: "Academics" },
+  { id: "calendar", label: "Calendar" },
+  { id: "phone", label: "Phone data" },
+  { id: "logs", label: "Event log" },
+];
+
+const BUILT_IN_LOCATION_IDS = new Set(Object.keys(LOCATIONS));
+const BUILT_IN_NPC_IDS = new Set(Object.keys(STARTER_NPCS));
+const BUILT_IN_COURSE_IDS = new Set(ACADEMIC_COURSES.map(course => course.id));
+const BUILT_IN_TEST_IDS = new Set(ACADEMIC_TESTS.map(test => test.id));
 
 function freeModelsEndpoint(endpoint: string): string {
   try {
@@ -49,6 +84,64 @@ function unwrapSavePayload(payload: unknown): GameState {
     return (payload as { state: GameState }).state;
   }
   return payload as GameState;
+}
+
+function unwrapWorldPackPayload(payload: unknown): WorldPack {
+  if (payload && typeof payload === "object" && "pack" in payload) {
+    return (payload as { pack: WorldPack }).pack;
+  }
+  return payload as WorldPack;
+}
+
+function formatSaveMeta(meta: SaveSlotMeta | undefined) {
+  if (!meta || meta.isEmpty) return "Empty slot";
+  const parts = [
+    typeof meta.day === "number" ? `Day ${meta.day}` : "",
+    typeof meta.timeSlot === "number" ? formatTimeOfDay(meta.timeSlot) : "",
+    meta.location ? LOCATIONS[meta.location]?.label || meta.location : "",
+  ].filter(Boolean);
+  const savedAt = meta.savedAt ? new Date(meta.savedAt).toLocaleString() : "";
+  return `${parts.join(" · ")}${savedAt ? ` · ${savedAt}` : ""}`;
+}
+
+function filterRecord<T>(record: Record<string, T> | undefined, keepIds: Set<string>): Record<string, T> {
+  return Object.fromEntries(Object.entries(record || {}).filter(([id]) => keepIds.has(id)));
+}
+
+function removeWorldPackFlags(flags: GameState["flags"]) {
+  return Object.fromEntries(Object.entries(flags || {}).filter(([key]) => !key.startsWith("world_pack_")));
+}
+
+function inspectStateSlice(state: GameState, filter: StateInspectorFilter) {
+  if (filter === "player") return state.player;
+  if (filter === "relationships") return state.player.relationships || {};
+  if (filter === "world") return state.world || {};
+  if (filter === "cast") {
+    return {
+      knownNpcIds: state.npcsKnown,
+      npcDirectory: state.npcDirectory || {},
+      starterNpcs: STARTER_NPCS,
+      presentNpcIds: state.presentNpcIds || state.scene?.presentNpcIds || state.currentScene?.presentNpcIds || [],
+    };
+  }
+  if (filter === "academics") return state.academics || {};
+  if (filter === "calendar") {
+    return {
+      calendar: state.calendar || {},
+      wake: state.wake || {},
+      day: state.day,
+      timeSlot: state.timeSlot,
+    };
+  }
+  if (filter === "phone") {
+    return {
+      messages: state.messages,
+      notes: state.notes,
+      narrator: state.narrator,
+    };
+  }
+  if (filter === "logs") return state.eventLog;
+  return state;
 }
 
 function formatPackSummary(summary: WorldPackImportSummary) {
@@ -98,6 +191,11 @@ export function NarratorLabApp({
   const [hasRequestedPackCatalog, setHasRequestedPackCatalog] = useState(false);
   const [lastPackSummary, setLastPackSummary] = useState<WorldPackImportSummary | null>(null);
   const [pendingWorldPack, setPendingWorldPack] = useState<{ pack: WorldPack; sourceFileName: string; summary: WorldPackImportSummary } | null>(null);
+  const [saveSlots, setSaveSlots] = useState<SaveSlotMeta[]>([]);
+  const [backupSlots, setBackupSlots] = useState<SaveSlotMeta[]>([]);
+  const [selectedSaveSlot, setSelectedSaveSlot] = useState<SaveSlotId>(SAVE_SLOT_IDS[0]);
+  const [selectedBackupId, setSelectedBackupId] = useState("");
+  const [stateInspectorFilter, setStateInspectorFilter] = useState<StateInspectorFilter>("full");
   const [running, setRunning] = useState(false);
   const saveInputRef = useRef<HTMLInputElement | null>(null);
   const worldPackInputRef = useRef<HTMLInputElement | null>(null);
@@ -118,11 +216,13 @@ export function NarratorLabApp({
   const [lastRunState, setLastRunState] = useState<GameState | null>(null);
   const canApply = Boolean(result?.parsed.statePatch);
   const canRunModel = providerType !== "http" || Boolean(model.trim());
-  const statePreview = useMemo(() => JSON.stringify(state, null, 2), [state]);
+  const statePreview = useMemo(() => JSON.stringify(inspectStateSlice(state, stateInspectorFilter), null, 2), [state, stateInspectorFilter]);
   const worldPackMeta = state.world?.packMeta || [];
   const latestWorldPack = worldPackMeta[worldPackMeta.length - 1];
   const importedNpcCount = Object.keys(normalizeNpcMap(state.world?.npcs)).length;
   const importedLocationCount = Object.keys(normalizeLocationMap(state.world?.locations)).length;
+  const selectedSlotMeta = saveSlots.find(slot => slot.id === selectedSaveSlot);
+  const selectedBackupMeta = backupSlots.find(slot => slot.id === selectedBackupId);
   const selectedBundledPack = useMemo(
     () => packCatalog.find(pack => pack.id === selectedPackId) || packCatalog[0],
     [packCatalog, selectedPackId],
@@ -131,6 +231,33 @@ export function NarratorLabApp({
   useEffect(() => {
     onNarratorSettingsChange({ mode: sceneMode, providerType, endpoint, model });
   }, [endpoint, model, onNarratorSettingsChange, providerType, sceneMode]);
+
+  async function refreshStorageTools() {
+    const [slots, backups] = await Promise.all([listSaveSlots(), listStateBackups()]);
+    setSaveSlots(slots);
+    setBackupSlots(backups);
+    if (!selectedBackupId && backups[0]) setSelectedBackupId(backups[0].id);
+    if (selectedBackupId && !backups.some(backup => backup.id === selectedBackupId)) {
+      setSelectedBackupId(backups[0]?.id || "");
+    }
+  }
+
+  useEffect(() => {
+    void refreshStorageTools();
+  }, []);
+
+  async function backupCurrentState(reason: string) {
+    const backup = await createStateBackup(state, reason);
+    await refreshStorageTools();
+    setSelectedBackupId(backup.id);
+    return backup;
+  }
+
+  async function replaceStateWithBackup(nextState: GameState, backupReason: string, successMessage: string) {
+    await backupCurrentState(backupReason);
+    onImportState(nextState, successMessage);
+    setGeneratedToolMessage(`${successMessage} Backup created first.`);
+  }
 
   async function refreshFreeModels() {
     setModelsLoading(true);
@@ -299,13 +426,125 @@ export function NarratorLabApp({
   }
 
   function exportCurrentWorldPack() {
-    exportJsonFile("student-body-world-pack", {
-      exportKind: "student-body-world-pack",
+    exportJsonFile("student-body-world-cast", {
+      exportKind: "student-body-world-cast",
       exportedAt: new Date().toISOString(),
       pack: buildWorldPackFromState(state),
     });
-    setToolMessage("Current world pack exported.");
+    setToolMessage("World/cast JSON exported.");
     setActiveView("state");
+  }
+
+  async function saveSelectedSlot() {
+    try {
+      const meta = await saveStateToSlot(selectedSaveSlot, state);
+      await refreshStorageTools();
+      setGeneratedToolMessage(`${meta.label} saved. ${formatSaveMeta(meta)}`);
+    } catch (caught) {
+      setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  async function loadSelectedSlot() {
+    try {
+      const importedState = await loadStateFromSlot(selectedSaveSlot);
+      if (!importedState) {
+        setGeneratedToolMessage(`${selectedSlotMeta?.label || "Selected slot"} is empty.`);
+        return;
+      }
+      await backupCurrentState(`Before loading ${selectedSlotMeta?.label || selectedSaveSlot}`);
+      onImportState(importedState, `${selectedSlotMeta?.label || "Save slot"} loaded.`);
+      setGeneratedToolMessage(`${selectedSlotMeta?.label || "Save slot"} loaded. Backup created first.`);
+    } catch (caught) {
+      setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  async function clearSelectedSlot() {
+    try {
+      await clearSaveSlot(selectedSaveSlot);
+      await refreshStorageTools();
+      setGeneratedToolMessage(`${selectedSlotMeta?.label || "Selected slot"} cleared.`);
+    } catch (caught) {
+      setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  async function restoreSelectedBackup() {
+    if (!selectedBackupId) {
+      setGeneratedToolMessage("No backup selected.");
+      return;
+    }
+
+    try {
+      const importedState = await loadStateBackup(selectedBackupId);
+      if (!importedState) {
+        setGeneratedToolMessage("Selected backup could not be loaded.");
+        await refreshStorageTools();
+        return;
+      }
+      await backupCurrentState("Before restoring backup");
+      onImportState(importedState, "Backup restored.");
+      setGeneratedToolMessage(`Restored backup. ${selectedBackupMeta ? formatSaveMeta(selectedBackupMeta) : "Current state was backed up first."}`);
+    } catch (caught) {
+      setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
+  async function resetAcademicsSection() {
+    const fresh = makeFreshState();
+    const academicTraits = new Set(["academic-momentum", "needs-review"]);
+    await replaceStateWithBackup({
+      ...state,
+      player: {
+        ...state.player,
+        traits: (state.player.traits || []).filter(trait => !academicTraits.has(trait)),
+      },
+      academics: fresh.academics,
+      calendar: fresh.calendar,
+    }, "Before resetting academics", "Academics reset.");
+  }
+
+  async function resetRelationshipsSection() {
+    await replaceStateWithBackup({
+      ...state,
+      player: {
+        ...state.player,
+        relationships: {},
+      },
+      chemistry: {},
+    }, "Before resetting relationships", "Relationships reset.");
+  }
+
+  async function resetWorldPackSection() {
+    const nextLocation = BUILT_IN_LOCATION_IDS.has(state.location) ? state.location : "dorm_room";
+    const nextKnownNpcs = [...new Set(["roommate", ...(state.npcsKnown || []).filter(npcId => BUILT_IN_NPC_IDS.has(npcId))])];
+    setPendingWorldPack(null);
+    setLastPackSummary(null);
+    await replaceStateWithBackup({
+      ...state,
+      location: nextLocation,
+      world: undefined,
+      npcDirectory: undefined,
+      npcMoods: filterRecord(state.npcMoods, BUILT_IN_NPC_IDS),
+      presentNpcIds: undefined,
+      presentNpcs: undefined,
+      scene: undefined,
+      currentScene: undefined,
+      npcsKnown: nextKnownNpcs,
+      locationKnowledge: filterRecord(state.locationKnowledge, BUILT_IN_LOCATION_IDS),
+      eventLog: state.eventLog.filter(event => !(event.text || event.summary || "").startsWith("Imported world pack")),
+      flags: removeWorldPackFlags(state.flags),
+      player: {
+        ...state.player,
+        relationships: filterRecord(state.player.relationships, BUILT_IN_NPC_IDS),
+      },
+      academics: {
+        prep: filterRecord(state.academics?.prep, BUILT_IN_COURSE_IDS),
+        completedTests: filterRecord(state.academics?.completedTests, BUILT_IN_TEST_IDS),
+        courses: filterRecord(state.academics?.courses, BUILT_IN_COURSE_IDS),
+      },
+    }, "Before resetting world pack", "World pack data reset.");
   }
 
   function stageWorldPackPreview(pack: WorldPack, sourceFileName: string) {
@@ -317,7 +556,7 @@ export function NarratorLabApp({
       : `Preview ready. ${formatPackSummary(summary)}`);
   }
 
-  function importPendingWorldPack() {
+  async function importPendingWorldPack() {
     if (!pendingWorldPack) {
       setGeneratedToolMessage("Preview a world pack before importing.");
       return;
@@ -328,10 +567,11 @@ export function NarratorLabApp({
     }
 
     try {
+      await backupCurrentState(`Before importing world/cast pack ${pendingWorldPack.sourceFileName}`);
       const summary = onImportWorldPack(pendingWorldPack.pack, pendingWorldPack.sourceFileName);
       setLastPackSummary(summary);
       setPendingWorldPack(null);
-      setGeneratedToolMessage(`Imported ${formatPackSummary(summary)}`);
+      setGeneratedToolMessage(`Imported ${formatPackSummary(summary)} Backup created first.`);
     } catch (caught) {
       setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
     }
@@ -342,8 +582,9 @@ export function NarratorLabApp({
       const payload = await readJsonFile(file);
       const importedState = unwrapSavePayload(payload);
       if (!importedState || typeof importedState !== "object") throw new Error("Save file did not contain a game state.");
-      onImportState(importedState);
-      setGeneratedToolMessage(`Imported save from ${file.name}.`);
+      await backupCurrentState(`Before importing save ${file.name}`);
+      onImportState(importedState, `Imported save from ${file.name}.`);
+      setGeneratedToolMessage(`Imported save from ${file.name}. Backup created first.`);
     } catch (caught) {
       setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
     }
@@ -351,7 +592,7 @@ export function NarratorLabApp({
 
   async function importWorldPackFile(file: File) {
     try {
-      const pack = await readJsonFile<WorldPack>(file);
+      const pack = unwrapWorldPackPayload(await readJsonFile(file));
       if (!pack || typeof pack !== "object") throw new Error("World pack file did not contain an object.");
       stageWorldPackPreview(pack, file.name);
     } catch (caught) {
@@ -653,6 +894,29 @@ export function NarratorLabApp({
                 <h3>Save Tools</h3>
                 <span>Day {state.day}</span>
               </header>
+              <div className="save-slot-row">
+                <label className="field-stack">
+                  <span>Manual save slot</span>
+                  <select value={selectedSaveSlot} onChange={event => setSelectedSaveSlot(event.target.value as SaveSlotId)}>
+                    {SAVE_SLOT_IDS.map(slotId => {
+                      const meta = saveSlots.find(slot => slot.id === slotId);
+                      return <option value={slotId} key={slotId}>{meta?.label || slotId}</option>;
+                    })}
+                  </select>
+                </label>
+                <div className="save-slot-actions">
+                  <button className="secondary-button" type="button" onClick={() => void saveSelectedSlot()}>
+                    Save Current
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => void loadSelectedSlot()} disabled={selectedSlotMeta?.isEmpty !== false}>
+                    Load
+                  </button>
+                  <button className="secondary-button" type="button" onClick={() => void clearSelectedSlot()} disabled={selectedSlotMeta?.isEmpty !== false}>
+                    Clear
+                  </button>
+                </div>
+              </div>
+              <p className="save-slot-meta">{formatSaveMeta(selectedSlotMeta)}</p>
               <div className="state-tool-actions">
                 <button className="secondary-button" type="button" onClick={exportSaveJson}>
                   Export Save JSON
@@ -661,18 +925,33 @@ export function NarratorLabApp({
                   Import Save JSON
                 </button>
                 <button className="secondary-button" type="button" onClick={exportCurrentWorldPack}>
-                  Export World Pack
+                  Export World/Cast
                 </button>
                 <button className="secondary-button" type="button" onClick={() => worldPackInputRef.current?.click()}>
-                  Preview World Pack
+                  Preview World/Cast
                 </button>
               </div>
+              <div className="backup-restore-row">
+                <label className="field-stack">
+                  <span>Import/reset backups</span>
+                  <select value={selectedBackupId} onChange={event => setSelectedBackupId(event.target.value)} disabled={!backupSlots.length}>
+                    <option value="">{backupSlots.length ? "Select a backup" : "No backups yet"}</option>
+                    {backupSlots.map(backup => (
+                      <option value={backup.id} key={backup.id}>{backup.reason || backup.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <button className="secondary-button" type="button" onClick={() => void restoreSelectedBackup()} disabled={!selectedBackupId}>
+                  Restore Backup
+                </button>
+              </div>
+              {selectedBackupMeta && <p className="save-slot-meta">{formatSaveMeta(selectedBackupMeta)}</p>}
               {toolMessage && <div className="state-tool-message">{toolMessage}</div>}
             </section>
 
             <section className="state-tool-section">
               <header>
-                <h3>World Pack</h3>
+                <h3>World/Cast Pack</h3>
                 <span>{worldPackMeta.length} imported</span>
               </header>
               <div className="bundled-pack-picker">
@@ -695,7 +974,7 @@ export function NarratorLabApp({
                 <button className="secondary-button" type="button" onClick={previewBundledWorldPack} disabled={packCatalogLoading || !selectedBundledPack}>
                   Preview
                 </button>
-                <button className="secondary-button" type="button" onClick={importPendingWorldPack} disabled={!pendingWorldPack || pendingWorldPack.summary.errorCount > 0}>
+                <button className="secondary-button" type="button" onClick={() => void importPendingWorldPack()} disabled={!pendingWorldPack || pendingWorldPack.summary.errorCount > 0}>
                   Import Preview
                 </button>
               </div>
@@ -763,8 +1042,31 @@ export function NarratorLabApp({
               ) : null}
             </section>
 
+            <section className="state-tool-section">
+              <header>
+                <h3>Reset Sections</h3>
+                <span>backs up first</span>
+              </header>
+              <div className="reset-action-row">
+                <button className="secondary-button" type="button" onClick={() => void resetAcademicsSection()}>
+                  Reset Academics
+                </button>
+                <button className="secondary-button" type="button" onClick={() => void resetRelationshipsSection()}>
+                  Reset Relationships
+                </button>
+                <button className="secondary-button" type="button" onClick={() => void resetWorldPackSection()}>
+                  Reset World Pack
+                </button>
+              </div>
+            </section>
+
             <label className="field-stack state-inspector">
               <span>Debug state inspector</span>
+              <select value={stateInspectorFilter} onChange={event => setStateInspectorFilter(event.target.value as StateInspectorFilter)}>
+                {STATE_INSPECTOR_FILTERS.map(filter => (
+                  <option value={filter.id} key={filter.id}>{filter.label}</option>
+                ))}
+              </select>
               <textarea readOnly value={statePreview} />
             </label>
           </div>

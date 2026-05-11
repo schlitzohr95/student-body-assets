@@ -2088,11 +2088,12 @@ button {
 }
 
 .state-tools-panel {
-  display: grid;
-  grid-template-rows: auto auto minmax(0, 1fr);
+  display: flex;
+  flex-direction: column;
   gap: 10px;
   min-height: 0;
-  overflow: hidden;
+  overflow: auto;
+  padding-right: 2px;
 }
 
 .state-tool-section {
@@ -2131,13 +2132,47 @@ button {
 
 .state-tool-actions {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(112px, 1fr));
   gap: 8px;
 }
 
 .state-tool-actions .secondary-button {
   min-width: 0;
   padding: 0 8px;
+}
+
+.save-slot-row,
+.backup-restore-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 8px;
+}
+
+.save-slot-actions,
+.reset-action-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.save-slot-actions .secondary-button,
+.reset-action-row .secondary-button,
+.backup-restore-row .secondary-button {
+  min-width: 0;
+  padding: 0 8px;
+}
+
+.backup-restore-row .secondary-button {
+  min-width: 118px;
+}
+
+.save-slot-meta {
+  margin: -2px 0 0;
+  color: #a89878;
+  font-size: 11px;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
 }
 
 .state-tool-message {
@@ -2231,12 +2266,11 @@ button {
 }
 
 .state-inspector {
-  min-height: 0;
+  min-height: 240px;
 }
 
 .state-inspector textarea {
-  height: 100%;
-  min-height: 0;
+  min-height: 220px;
   resize: none;
   padding: 10px;
 }

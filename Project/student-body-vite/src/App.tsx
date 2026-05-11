@@ -253,11 +253,11 @@ export default function App() {
       : current);
   }, []);
 
-  const handleImportState = useCallback((importedState: GameState) => {
+  const handleImportState = useCallback((importedState: GameState, notificationBody = "Save JSON imported.") => {
     const normalized = normalizeState(importedState);
     setState(normalized);
     setGeneratedScene(null);
-    showNotification({ app: "Beacon", body: "Save JSON imported." });
+    showNotification({ app: "Beacon", body: notificationBody });
   }, [showNotification]);
 
   const handleImportWorldPack = useCallback((pack: WorldPack, sourceFileName?: string) => {

@@ -2,6 +2,16 @@
 
 Beacon's State tab is the current dev surface for save/load/export work.
 
+## Manual Slots And Backups
+
+The running game still autosaves to the normal local state key. The State tab now also has four manual save slots for testing:
+
+- `Save Current` writes the current state into the selected slot
+- `Load` restores the selected slot and creates an automatic backup first
+- `Clear` empties the selected slot
+
+Imports and reset actions create a timestamped backup before they change the current state. The latest backups are available in the `Import/reset backups` selector and can be restored from the same tab.
+
 ## Save JSON
 
 `Export Save JSON` downloads a wrapper object:
@@ -21,9 +31,9 @@ Beacon's State tab is the current dev surface for save/load/export work.
 Beacon supports two world-pack loading paths:
 
 - `Preview` reads an authored JSON pack from `public/world-packs/manifest.json`, validates it, and stages it for import
-- `Preview World Pack` reads a local JSON file with the same pack shape
-- `Import Preview` applies the staged pack if it has no blocking errors
-- `Export World Pack` exports the currently imported/authored world content from the running save
+- `Preview World/Cast` reads a local JSON file with the same pack shape, or an exported wrapper with a nested `pack`
+- `Import Preview` applies the staged pack if it has no blocking errors and creates a backup first
+- `Export World/Cast` exports only the currently imported/authored world and cast content from the running save
 
 The bundled manifest shape is:
 
@@ -181,3 +191,13 @@ Blocking errors prevent `Import Preview` until fixed. Current blocking errors in
 Imported academic courses and tests appear in Spark and test calendar reminders. Imported bulletin posts appear on the Student Union bulletin board in Compass. Imported relationships appear in Roster after the related NPC is known.
 
 The bundled examples live in `public/world-packs/`. `campus-life-starter.json` stays compact enough to inspect by hand, `town-side-rumors.json` exercises discovery seeds and town NPC schedules, `arts-and-activism.json` exercises creative campus flavor with a course/test/bulletins, and `honors-pressure.json` exercises higher-pressure academic content.
+
+## Debug And Section Resets
+
+The debug state inspector can be filtered to `Full state`, `Player`, `Relationships`, `World pack`, `Cast`, `Academics`, `Calendar`, `Phone data`, or `Event log`.
+
+Reset buttons are intentionally section-scoped:
+
+- `Reset Academics` clears prep, completed tests, course records, academic reminder history, and academic-only traits
+- `Reset Relationships` clears relationship records and chemistry observations, then the normal state migration rebuilds baseline records
+- `Reset World Pack` removes imported world/cast data, imported schedules, pack-authored classes/tests/bulletins/arcs, imported NPC contacts, and imported location knowledge while preserving built-in locations and starter cast
