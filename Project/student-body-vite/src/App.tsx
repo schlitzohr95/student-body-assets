@@ -261,12 +261,32 @@ export default function App() {
   }, [showNotification]);
 
   const handleImportWorldPack = useCallback((pack: WorldPack, sourceFileName?: string) => {
-    if (!state) return { name: "World pack", npcCount: 0, locationCount: 0, scheduleCount: 0, arcCount: 0, eventCount: 0 };
+    if (!state) {
+      return {
+        name: "World pack",
+        npcCount: 0,
+        locationCount: 0,
+        scheduleCount: 0,
+        arcCount: 0,
+        eventCount: 0,
+        relationshipCount: 0,
+        knownLocationCount: 0,
+        rumoredLocationCount: 0,
+        warningCount: 0,
+        errorCount: 0,
+        issues: [],
+      };
+    }
     const result = applyWorldPack(state, pack, sourceFileName);
     setState(normalizeState(result.state));
+    const extras = [
+      result.summary.relationshipCount ? `${result.summary.relationshipCount} relationships` : "",
+      result.summary.knownLocationCount || result.summary.rumoredLocationCount ? `${result.summary.knownLocationCount + result.summary.rumoredLocationCount} intel` : "",
+      result.summary.warningCount ? `${result.summary.warningCount} warnings` : "",
+    ].filter(Boolean).join(", ");
     showNotification({
       app: "Beacon",
-      body: `World pack imported: ${result.summary.npcCount} NPCs, ${result.summary.locationCount} locations.`,
+      body: `World pack imported: ${result.summary.npcCount} NPCs, ${result.summary.locationCount} locations${extras ? `, ${extras}` : ""}.`,
     });
     return result.summary;
   }, [showNotification, state]);

@@ -352,6 +352,10 @@ export interface WorldPack {
   arcs?: unknown;
   storyArcs?: unknown;
   knownNpcIds?: NpcId[];
+  knownLocationIds?: LocationId[];
+  rumoredLocationIds?: LocationId[];
+  relationships?: Record<NpcId, RelationshipRecord | number | string> | Array<RelationshipRecord & { id?: NpcId; npcId?: NpcId }>;
+  initialRelationships?: Record<NpcId, RelationshipRecord | number | string> | Array<RelationshipRecord & { id?: NpcId; npcId?: NpcId }>;
   flags?: Record<string, unknown>;
   [key: string]: unknown;
 }

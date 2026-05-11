@@ -9,6 +9,15 @@
       "npcCount": 5,
       "locationCount": 2,
       "tags": ["starter", "cast", "schedules", "arcs"]
+    },
+    {
+      "id": "town-side-rumors",
+      "name": "Town-Side Rumors",
+      "description": "Adds discoverable town locations, a commuter contact, shop-adjacent schedules, relationship seeds, and event hooks.",
+      "path": "/world-packs/town-side-rumors.json",
+      "npcCount": 3,
+      "locationCount": 3,
+      "tags": ["town", "discovery", "relationships", "calendar"]
     }
   ]
 }

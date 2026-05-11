@@ -51,6 +51,17 @@ function unwrapSavePayload(payload: unknown): GameState {
   return payload as GameState;
 }
 
+function formatPackSummary(summary: WorldPackImportSummary) {
+  const parts = [
+    `${summary.npcCount} NPCs`,
+    `${summary.locationCount} locations`,
+    summary.relationshipCount ? `${summary.relationshipCount} relationships` : "",
+    summary.knownLocationCount || summary.rumoredLocationCount ? `${summary.knownLocationCount + summary.rumoredLocationCount} location intel` : "",
+    summary.warningCount ? `${summary.warningCount} warnings` : "",
+  ].filter(Boolean);
+  return `${summary.name}: ${parts.join(", ")}.`;
+}
+
 export function NarratorLabApp({
   state,
   onApplyResult,
@@ -82,6 +93,7 @@ export function NarratorLabApp({
   const [packCatalogLoading, setPackCatalogLoading] = useState(false);
   const [packCatalogError, setPackCatalogError] = useState<string | null>(null);
   const [hasRequestedPackCatalog, setHasRequestedPackCatalog] = useState(false);
+  const [lastPackSummary, setLastPackSummary] = useState<WorldPackImportSummary | null>(null);
   const [running, setRunning] = useState(false);
   const saveInputRef = useRef<HTMLInputElement | null>(null);
   const worldPackInputRef = useRef<HTMLInputElement | null>(null);
@@ -299,7 +311,8 @@ export function NarratorLabApp({
       const pack = await readJsonFile<WorldPack>(file);
       if (!pack || typeof pack !== "object") throw new Error("World pack file did not contain an object.");
       const summary = onImportWorldPack(pack, file.name);
-      setGeneratedToolMessage(`Imported ${summary.name}: ${summary.npcCount} NPCs, ${summary.locationCount} locations.`);
+      setLastPackSummary(summary);
+      setGeneratedToolMessage(`Imported ${formatPackSummary(summary)}`);
     } catch (caught) {
       setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
     }
@@ -333,7 +346,8 @@ export function NarratorLabApp({
     try {
       const pack = await fetchWorldPack(selectedBundledPack);
       const summary = onImportWorldPack(pack, selectedBundledPack.path);
-      setGeneratedToolMessage(`Loaded ${summary.name}: ${summary.npcCount} NPCs, ${summary.locationCount} locations.`);
+      setLastPackSummary(summary);
+      setGeneratedToolMessage(`Loaded ${formatPackSummary(summary)}`);
     } catch (caught) {
       setPackCatalogError(caught instanceof Error ? caught.message : String(caught));
       setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
@@ -655,7 +669,35 @@ export function NarratorLabApp({
                   <dt>Locations</dt>
                   <dd>{importedLocationCount}</dd>
                 </div>
+                {lastPackSummary && (
+                  <>
+                    <div>
+                      <dt>Relationships</dt>
+                      <dd>{lastPackSummary.relationshipCount}</dd>
+                    </div>
+                    <div>
+                      <dt>Location Intel</dt>
+                      <dd>{lastPackSummary.knownLocationCount} known / {lastPackSummary.rumoredLocationCount} rumored</dd>
+                    </div>
+                    <div>
+                      <dt>Warnings</dt>
+                      <dd>{lastPackSummary.warningCount}</dd>
+                    </div>
+                  </>
+                )}
               </dl>
+              {lastPackSummary?.issues.length ? (
+                <details className="world-pack-issues">
+                  <summary>Validation notes</summary>
+                  <ul>
+                    {lastPackSummary.issues.map(issue => (
+                      <li key={`${issue.severity}-${issue.path}-${issue.message}`}>
+                        <strong>{issue.severity}</strong> {issue.path}: {issue.message}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              ) : null}
             </section>
 
             <label className="field-stack state-inspector">

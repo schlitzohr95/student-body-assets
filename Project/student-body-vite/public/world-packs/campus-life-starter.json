@@ -194,7 +194,68 @@
       ]
     }
   ],
-  "knownNpcIds": [],
+  "knownNpcIds": ["ra", "professor"],
+  "knownLocationIds": ["art_studio", "seminar_room"],
+  "rumoredLocationIds": [],
+  "relationships": {
+    "ra": {
+      "score": 1,
+      "status": "floor contact",
+      "traits": ["responsible", "watchful"],
+      "flags": { "trust": 1, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Knows your room number, not your story.",
+      "recentMoments": [
+        {
+          "id": "pack-ra-floor-roster",
+          "day": 1,
+          "slot": 32,
+          "location": "dorm_hallway",
+          "label": "Floor roster",
+          "text": "Jordan's name is on the RA board beside a neat grid of office-hour cards.",
+          "tags": ["world-pack", "contact"]
+        }
+      ]
+    },
+    "professor": {
+      "score": 0,
+      "status": "course instructor",
+      "traits": ["precise", "academically distant"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Professional distance until you give her work to judge.",
+      "recentMoments": [
+        {
+          "id": "pack-professor-syllabus",
+          "day": 1,
+          "slot": 36,
+          "location": "lecture_hall",
+          "label": "Syllabus name",
+          "text": "Dr. Hale's syllabus reads like someone who expects preparation and notices evasions.",
+          "tags": ["world-pack", "class"]
+        }
+      ]
+    },
+    "artistic": {
+      "score": 0,
+      "status": "campus stranger",
+      "traits": ["creative", "guarded"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Not yet met."
+    },
+    "athletic": {
+      "score": 0,
+      "status": "campus stranger",
+      "traits": ["consistent", "direct"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Not yet met."
+    },
+    "townie": {
+      "score": 0,
+      "status": "town stranger",
+      "traits": ["observant", "dry"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Not yet met."
+    }
+  },
   "flags": {
     "world_pack_campus_life_starter": true
   }

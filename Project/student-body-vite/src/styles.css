@@ -2185,6 +2185,30 @@ button {
   overflow-wrap: anywhere;
 }
 
+.world-pack-issues {
+  color: #d8cbb3;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.world-pack-issues summary {
+  cursor: pointer;
+  color: #c8a165;
+}
+
+.world-pack-issues ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.world-pack-issues li + li {
+  margin-top: 4px;
+}
+
+.world-pack-issues strong {
+  color: #f0ebdc;
+}
+
 .state-inspector {
   min-height: 0;
 }

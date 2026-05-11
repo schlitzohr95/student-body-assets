@@ -1,0 +1,204 @@
+{
+  "id": "town-side-rumors",
+  "name": "Town-Side Rumors",
+  "version": "0.1.0",
+  "author": "Student Body dev pack",
+  "description": "A small pack for testing hidden locations, rumors, NPC schedules, starter relationship records, and calendar hooks.",
+  "npcs": {
+    "commuter": {
+      "id": "commuter",
+      "name": "Len Cruz",
+      "portraitKey": "wildcard",
+      "archetype": "Commuter",
+      "role": "First-year commuter who knows the bus routes and which town places are worth the walk",
+      "defaultLocation": "late_bus_stop",
+      "currentLocation": "late_bus_stop",
+      "schema": {
+        "ageBand": "adult peer",
+        "publicFace": "Practical, amused, always tracking the clock.",
+        "voice": "Fast, specific, and dry when campus people discover normal transit problems.",
+        "wants": ["Reliable plans", "Friends who account for travel time", "A campus life that does not assume dorm access"],
+        "whatLands": ["Being on time", "Remembering routes", "Not romanticizing being busy"],
+        "whatFallsFlat": ["Making town sound exotic", "Casual lateness", "Complaining about short walks"],
+        "boundaries": ["Last buses matter", "Family time is not flexible filler"]
+      },
+      "currentMood": "Checking the route board and half-listening for familiar voices.",
+      "lastSeenDisposition": "Knows you by sight if you use the stop twice."
+    },
+    "radio_host": {
+      "id": "radio_host",
+      "name": "Tess Morgan",
+      "portraitKey": "wildcard",
+      "archetype": "Connector",
+      "role": "Student radio host and late-night event collector",
+      "defaultLocation": "record_store",
+      "currentLocation": "record_store",
+      "schema": {
+        "ageBand": "adult peer",
+        "publicFace": "Bright, nosy, better at making people talk than admitting vulnerability.",
+        "voice": "Rhythmic, curious, and casually theatrical.",
+        "wants": ["Good stories", "People who show up for local scenes", "A reason to trust quiet classmates"],
+        "whatLands": ["Specific recommendations", "Following through on invitations", "Admitting when something moves you"],
+        "whatFallsFlat": ["Trying to be effortlessly cool", "Name-dropping", "Treating music taste as a test"],
+        "boundaries": ["On-air stories need consent", "Performance is not permission"]
+      },
+      "currentMood": "Sorting flyers with one ear on the speakers.",
+      "lastSeenDisposition": "Not yet met."
+    },
+    "garden_lead": {
+      "id": "garden_lead",
+      "name": "Maya Rios",
+      "portraitKey": "wildcard",
+      "archetype": "Organizer",
+      "role": "Community garden coordinator with a patient but exacting way of assigning tasks",
+      "defaultLocation": "community_garden",
+      "currentLocation": "community_garden",
+      "schema": {
+        "ageBand": "older student",
+        "publicFace": "Grounded, direct, generous after effort is visible.",
+        "voice": "Plain and tactile; talks in tasks, weather, and consequences.",
+        "wants": ["People who return after the fun part", "Students who respect town labor", "Less performative volunteering"],
+        "whatLands": ["Useful questions", "Staying to clean up", "Owning mistakes without a speech"],
+        "whatFallsFlat": ["Volunteer selfies", "Overexplaining", "Showing up late with charm"],
+        "boundaries": ["Plants and people both need consistency"]
+      },
+      "currentMood": "Busy, observant, and willing to hand a newcomer a real job.",
+      "lastSeenDisposition": "Not yet met."
+    }
+  },
+  "locations": {
+    "late_bus_stop": {
+      "id": "late_bus_stop",
+      "label": "Late Bus Stop",
+      "cat": "town",
+      "description": "A covered stop under a flickering route display, where campus plans meet the town's actual schedule.",
+      "hours": "Buses until 11:45 PM",
+      "hiddenUntilDiscovered": true
+    },
+    "record_store": {
+      "id": "record_store",
+      "label": "Record Store",
+      "cat": "town",
+      "description": "A narrow shop with listening stations, event flyers, and clerks who know when someone is pretending.",
+      "hours": "Tue-Sun 11:00 AM-8:00 PM",
+      "hiddenUntilDiscovered": true
+    },
+    "community_garden": {
+      "id": "community_garden",
+      "label": "Community Garden",
+      "cat": "outdoor",
+      "description": "Raised beds behind a church annex, all soil, hand-painted signs, and quiet forms of obligation.",
+      "hours": "Dawn-dusk",
+      "hiddenUntilDiscovered": true
+    }
+  },
+  "npcSchedules": {
+    "commuter": {
+      "weekday": [
+        { "start": "07:30", "end": "08:30", "location": "late_bus_stop", "mood": "arriving from town" },
+        { "start": "12:00", "end": "13:00", "location": "student_union", "mood": "eating between classes" },
+        { "start": "18:00", "end": "19:00", "location": "late_bus_stop", "mood": "watching the evening bus window" }
+      ]
+    },
+    "radio_host": {
+      "friday": [
+        { "start": "16:00", "end": "18:00", "location": "record_store", "mood": "collecting show flyers" }
+      ],
+      "weekend": [
+        { "start": "14:00", "end": "17:00", "location": "record_store", "mood": "listening for recommendations" }
+      ]
+    },
+    "garden_lead": {
+      "wednesday": [
+        { "start": "17:00", "end": "18:30", "location": "community_garden", "mood": "running a volunteer block" }
+      ],
+      "saturday": [
+        { "start": "09:00", "end": "11:30", "location": "community_garden", "mood": "assigning practical work" }
+      ]
+    }
+  },
+  "calendarEvents": [
+    {
+      "id": "record_store_open_mic_signup",
+      "title": "Open Mic Signup Sheet",
+      "kind": "social",
+      "day": 12,
+      "startSlot": 64,
+      "endSlot": 72,
+      "location": "record_store",
+      "description": "Tess is gathering names and song titles at the record store.",
+      "npcIds": ["radio_host"]
+    },
+    {
+      "id": "community_garden_cleanup",
+      "title": "Community Garden Cleanup",
+      "kind": "social",
+      "day": 13,
+      "startSlot": 36,
+      "endSlot": 46,
+      "location": "community_garden",
+      "description": "Maya needs steady hands more than inspiring speeches.",
+      "npcIds": ["garden_lead"]
+    }
+  ],
+  "arcs": [
+    {
+      "id": "last_bus_math",
+      "label": "Last Bus Math",
+      "type": "logistics",
+      "beats": [
+        { "id": "learn_bus_stop", "trigger": "talk_to_commuter_about_routes", "npcIds": ["commuter"] },
+        { "id": "miss_or_make_last_bus", "trigger": "late_town_departure", "npcIds": ["commuter"] }
+      ]
+    },
+    {
+      "id": "town_scene_threads",
+      "label": "Town Scene Threads",
+      "type": "social",
+      "beats": [
+        { "id": "record_store_rumor", "trigger": "buzz_or_pulse_mentions_record_store", "npcIds": ["radio_host"] },
+        { "id": "garden_followthrough", "trigger": "attend_cleanup_and_stay", "npcIds": ["garden_lead"] }
+      ]
+    }
+  ],
+  "knownNpcIds": ["commuter"],
+  "knownLocationIds": ["late_bus_stop"],
+  "rumoredLocationIds": ["record_store", "community_garden"],
+  "relationships": {
+    "commuter": {
+      "score": 1,
+      "status": "route acquaintance",
+      "traits": ["practical", "time-aware"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Recognizes you as someone who may need route advice.",
+      "recentMoments": [
+        {
+          "id": "pack-commuter-route-tip",
+          "day": 1,
+          "slot": 48,
+          "location": "student_union",
+          "label": "Route tip",
+          "text": "Len mentioned the late stop when someone complained about town being too far.",
+          "tags": ["world-pack", "travel"]
+        }
+      ]
+    },
+    "radio_host": {
+      "score": 0,
+      "status": "rumored contact",
+      "traits": ["curious", "social"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Known mostly through flyers and secondhand stories."
+    },
+    "garden_lead": {
+      "score": 0,
+      "status": "rumored contact",
+      "traits": ["steady", "demanding"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Known through a volunteer notice pinned crookedly in the Union."
+    }
+  },
+  "flags": {
+    "world_pack_town_side_rumors": true
+  }
+}

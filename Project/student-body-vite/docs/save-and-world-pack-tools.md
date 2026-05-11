@@ -37,6 +37,15 @@ The bundled manifest shape is:
       "npcCount": 5,
       "locationCount": 2,
       "tags": ["starter", "cast", "schedules", "arcs"]
+    },
+    {
+      "id": "town-side-rumors",
+      "name": "Town-Side Rumors",
+      "description": "Adds discoverable town locations, relationship seeds, and event hooks.",
+      "path": "/world-packs/town-side-rumors.json",
+      "npcCount": 3,
+      "locationCount": 3,
+      "tags": ["town", "discovery", "relationships", "calendar"]
     }
   ]
 }
@@ -67,8 +76,27 @@ Each pack file accepts a loose authored shape. Supported top-level keys:
     }
   },
   "schedules": {},
+  "knownNpcIds": ["debate_captain"],
+  "knownLocationIds": ["debate_room"],
+  "rumoredLocationIds": ["late_bus_stop"],
+  "relationships": {
+    "debate_captain": {
+      "score": 1,
+      "status": "club contact",
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "recentMoments": [
+        {
+          "id": "debate-flyer",
+          "day": 1,
+          "slot": 48,
+          "location": "student_union",
+          "label": "Flyer",
+          "text": "Avery's name is on the debate table signup sheet."
+        }
+      ]
+    }
+  },
   "arcs": [],
-  "knownNpcIds": [],
   "flags": {}
 }
 ```
@@ -79,7 +107,14 @@ Aliases are accepted for authoring convenience:
 - `places` can stand in for `locations`
 - `npcSchedules` can sit beside `schedules`
 - `storyArcs` can stand in for `arcs`
+- `initialRelationships` can stand in for `relationships`
 
 Imported NPCs are merged into `state.npcDirectory`, imported locations are stored in `state.world.locations`, and Compass plus narrator context can read the added locations immediately.
 
-The first bundled example lives at `public/world-packs/campus-life-starter.json` and is intentionally small enough to inspect by hand while still exercising cast, location, schedule, and arc imports.
+`knownLocationIds` and `rumoredLocationIds` seed Compass discovery state. Known locations appear with hours available; rumored locations appear with hours hidden until visited. This lets a pack add places that are fully authored but not all equally known at the start.
+
+`relationships` seeds the player's relationship records with imported or built-in NPCs. These records use the same shape as the runtime relationship system: score, status, traits, flags, last-seen disposition, and recent shared moments.
+
+Beacon validates packs during import and reports warnings for common authoring mistakes, such as schedule blocks pointing at missing locations, calendar events missing required fields, NPCs without schemas, or relationship seeds for unknown NPC ids. Warnings do not block import; they are meant to keep authored packs debuggable.
+
+The bundled examples live in `public/world-packs/`. `campus-life-starter.json` stays compact enough to inspect by hand, while `town-side-rumors.json` exercises discovery seeds, hidden locations, relationship seeds, schedules, calendar events, and arcs.
