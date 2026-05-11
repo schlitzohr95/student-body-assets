@@ -1,7 +1,17 @@
 import type { GameState, Scene } from "../types/game";
 import { getDaypartLabel } from "../data/locations";
 import { getLocationDirectory, getNpcsAtLocation } from "./calendar";
+import { canPurchaseItem } from "./economy";
 import { gateChoice } from "./relationships";
+
+function purchaseChoice(state: GameState, choice: { id: string; label: string; tag?: string }, itemId: string) {
+  const check = canPurchaseItem(state, itemId);
+  return check.ok ? choice : { ...choice, disabledReason: check.reason };
+}
+
+function energyChoice(state: GameState, choice: { id: string; label: string; tag?: string }, minEnergy: number) {
+  return state.player.resources.energy >= minEnergy ? choice : { ...choice, disabledReason: `Needs ${minEnergy} energy.` };
+}
 
 export function getScriptedScene(state: GameState): Scene {
   const { location, day, timeSlot, metMari, introSeen } = state;
@@ -23,8 +33,8 @@ export function getScriptedScene(state: GameState): Scene {
       narration:
         "The bell above the door chimes. The shop smells like good coffee and old wood. Behind the counter, a barista with copper hair glances up, registers new face, and gives you a half-smile that's mostly professional with a little curiosity underneath. \"What can I get you?\"",
       choices: [
-        { id: "order_drip", label: "\"Just a drip coffee, please.\"", tag: "met_mari" },
-        { id: "order_fancy", label: "\"What do you recommend?\"", tag: "met_mari" },
+        purchaseChoice(state, { id: "order_drip", label: "\"Just a drip coffee, please.\"", tag: "met_mari" }, "drip_coffee"),
+        purchaseChoice(state, { id: "order_fancy", label: "\"What do you recommend?\"", tag: "met_mari" }, "fancy_latte"),
         { id: "look_around", label: "Stall and read the menu", tag: "met_mari_quiet" },
       ],
     };
@@ -35,8 +45,9 @@ export function getScriptedScene(state: GameState): Scene {
       narration:
         "The shop is quieter this time. Mari spots you and gives a small nod from behind the espresso machine. The same booth by the window is open.",
       choices: [
-        { id: "sit_window", label: "Take the window booth and study" },
+        purchaseChoice(state, { id: "sit_window", label: "Take the window booth and study" }, "drip_coffee"),
         { id: "chat_counter", label: "Lean on the counter and chat" },
+        purchaseChoice(state, { id: "buy_pastry", label: "Buy a pastry for later" }, "pastry"),
         gateChoice(
           state,
           { id: "ask_mari_about_marcus", label: "Ask how she knows Marcus" },
@@ -97,6 +108,7 @@ export function getScriptedScene(state: GameState): Scene {
       choices: [
         { id: "browse_flyers", label: "Check the bulletin board" },
         { id: "people_watch", label: "People-watch from a couch" },
+        energyChoice(state, { id: "work_union_shift", label: "Work a desk shift" }, 25),
         { id: "leave", label: "Cut through and leave" },
       ],
     };
@@ -107,7 +119,7 @@ export function getScriptedScene(state: GameState): Scene {
       narration:
         "The dining hall hums with trays, half-finished conversations, and the practical relief of food you do not have to cook.",
       choices: [
-        { id: "eat_meal", label: "Eat a real meal" },
+        purchaseChoice(state, { id: "eat_meal", label: "Eat a real meal" }, "dining_meal"),
         { id: "sit_with_strangers", label: "Sit near a busy table" },
         { id: "leave", label: "Take something to go" },
       ],
@@ -120,7 +132,9 @@ export function getScriptedScene(state: GameState): Scene {
         "The bookstore smells like paper, dust, and branded sweatshirts. The course texts are up front, but the better shelves wait in back.",
       choices: [
         { id: "browse_books", label: "Browse the back shelves" },
-        { id: "buy_supplies", label: "Buy basic supplies" },
+        purchaseChoice(state, { id: "buy_supplies", label: "Buy basic supplies" }, "school_supplies"),
+        purchaseChoice(state, { id: "buy_snack_pack", label: "Buy a snack pack" }, "snack_pack"),
+        energyChoice(state, { id: "work_bookstore_shift", label: "Work a shelving shift" }, 22),
         { id: "leave", label: "Head back outside" },
       ],
     };

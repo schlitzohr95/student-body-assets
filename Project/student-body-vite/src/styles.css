@@ -552,11 +552,13 @@ button {
   cursor: default;
 }
 
-.compass-bulletin {
+.compass-bulletin,
+.compass-shop {
   min-height: 0;
 }
 
-.bulletin-list {
+.bulletin-list,
+.shop-list {
   min-height: 0;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -565,7 +567,8 @@ button {
   padding-right: 2px;
 }
 
-.bulletin-card {
+.bulletin-card,
+.shop-card {
   min-width: 0;
   display: grid;
   align-content: start;
@@ -577,7 +580,20 @@ button {
   font-family: system-ui, sans-serif;
 }
 
-.bulletin-card small {
+.shop-card {
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+}
+
+.shop-card div {
+  min-width: 0;
+  display: grid;
+  gap: 5px;
+}
+
+.bulletin-card small,
+.shop-card small,
+.shop-card span {
   color: #c8a165;
   font-size: 10px;
   font-weight: 800;
@@ -585,11 +601,13 @@ button {
   text-transform: uppercase;
 }
 
-.bulletin-card strong {
+.bulletin-card strong,
+.shop-card strong {
   font-size: 13px;
 }
 
-.bulletin-card p {
+.bulletin-card p,
+.shop-card p {
   margin: 0;
   color: rgba(240, 235, 220, 0.72);
   font-size: 12px;
@@ -847,6 +865,38 @@ button {
   display: grid;
   gap: 4px;
   margin-bottom: 10px;
+}
+
+.inventory-list {
+  display: grid;
+  gap: 8px;
+}
+
+.inventory-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid rgba(58, 53, 48, 0.1);
+  border-radius: 6px;
+  background: rgba(58, 53, 48, 0.05);
+}
+
+.inventory-item div {
+  display: grid;
+  gap: 2px;
+}
+
+.inventory-item strong {
+  color: #302b24;
+  font-size: 13px;
+}
+
+.inventory-item small,
+.inventory-item span {
+  color: #7a6e58;
+  font-size: 12px;
 }
 
 .stat-row__label,
@@ -2205,7 +2255,8 @@ button {
     text-align: left;
   }
 
-  .bulletin-list {
+  .bulletin-list,
+  .shop-list {
     grid-template-columns: 1fr;
   }
 

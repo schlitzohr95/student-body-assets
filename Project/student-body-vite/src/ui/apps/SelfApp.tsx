@@ -1,3 +1,4 @@
+import { inventoryEntries } from "../../engine/economy";
 import type { GameState, StatKey } from "../../types/game";
 
 interface SelfAppProps {
@@ -13,6 +14,8 @@ const statLabels: Array<[StatKey, string]> = [
 ];
 
 export function SelfApp({ state }: SelfAppProps) {
+  const inventory = inventoryEntries(state);
+
   return (
     <div className="self-app">
       <section className="phone-panel">
@@ -39,6 +42,24 @@ export function SelfApp({ state }: SelfAppProps) {
           <span>Money</span>
           <span>${state.player.resources.money}</span>
         </div>
+      </section>
+      <section className="phone-panel">
+        <h2>Inventory</h2>
+        {inventory.length ? (
+          <div className="inventory-list">
+            {inventory.map(({ item, stack }) => (
+              <article className="inventory-item" key={item.id}>
+                <div>
+                  <strong>{item.label}</strong>
+                  <small>{item.kind}</small>
+                </div>
+                <span>x{stack.quantity}</span>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <p className="subtle-copy">No items yet.</p>
+        )}
       </section>
     </div>
   );

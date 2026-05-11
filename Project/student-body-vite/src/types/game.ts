@@ -14,6 +14,15 @@ export interface PlayerResources {
   money: number;
 }
 
+export type InventoryItemKind = "food" | "coffee" | "transit" | "study" | "key_item" | "misc";
+
+export interface InventoryItemStack {
+  itemId: string;
+  quantity: number;
+  acquiredDay?: number;
+  acquiredSlot?: TimeSlotIndex;
+}
+
 export interface RelationshipMoment {
   id: string;
   day: number;
@@ -42,6 +51,7 @@ export interface PlayerState {
   name: string;
   stats: PlayerStats;
   resources: PlayerResources;
+  inventory?: Record<string, InventoryItemStack>;
   traits?: string[];
   relationships?: Record<NpcId, RelationshipRecord | number | string>;
 }

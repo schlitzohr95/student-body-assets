@@ -5,6 +5,7 @@ import { advanceTime, appendEvent } from "./state";
 import { updateRoommateStudiousChemistry } from "./chemistry";
 import { addAcademicPrep } from "./academics";
 import { getLocationDirectory, maybeIssueCalendarReminder } from "./calendar";
+import { purchaseItem } from "./economy";
 import { learnLocation, visitLocation } from "./locationKnowledge";
 import { deliverDuePulseReplies, outgoingPulseText, queuePulseMessage, type PulseTemplateId } from "./pulse";
 import { addSharedMoment, addSharedMomentForMany, getRelationshipFlag, updateRelationship } from "./relationships";
@@ -65,7 +66,7 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
 
   switch (choice.id) {
     case "study_deep":
-      next = changeResources(changeStats(next, { knowledge: 4, grit: 1 }), { energy: -8 });
+      next = changeResources(changeStats(next, { knowledge: 4, grit: 1 }), { energy: -10 });
       next = addAcademicPrep(next, "soc101", { studyChunks: 6, focus: 3 });
       next = appendEvent(next, "Studied seriously at the library.");
       break;
@@ -75,15 +76,15 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
       next = appendEvent(next, "Wandered the library stacks and found a few promising books.");
       break;
     case "workout_weights":
-      next = changeResources(changeStats(next, { athletics: 4, grit: 2 }), { energy: -12 });
+      next = changeResources(changeStats(next, { athletics: 4, grit: 2 }), { energy: -14 });
       next = appendEvent(next, "Lifted weights at the gym.");
       break;
     case "workout_cardio":
-      next = changeResources(changeStats(next, { athletics: 3, grit: 1 }), { energy: -10 });
+      next = changeResources(changeStats(next, { athletics: 3, grit: 1 }), { energy: -12 });
       next = appendEvent(next, "Put in a cardio session at the gym.");
       break;
     case "trail_run":
-      next = changeResources(changeStats(next, { athletics: 3, grit: 1 }), { energy: -9 });
+      next = changeResources(changeStats(next, { athletics: 3, grit: 1 }), { energy: -10 });
       next = appendEvent(next, "Ran the creekside trail.");
       break;
     case "trail_walk":
@@ -115,7 +116,7 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
       next = appendEvent(next, "People-watched in the student union.");
       break;
     case "eat_meal":
-      next = changeResources(next, { energy: 14, money: -4 });
+      next = purchaseItem(next, "dining_meal").state;
       next = appendEvent(next, "Ate a real meal at the dining hall.");
       break;
     case "sit_with_strangers":
@@ -127,11 +128,11 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
       next = appendEvent(next, "Browsed the back shelves at the bookstore.");
       break;
     case "buy_supplies":
-      next = changeResources(changeStats(next, { grit: 1 }), { money: -8 });
+      next = purchaseItem(next, "school_supplies").state;
       next = appendEvent(next, "Bought basic school supplies.");
       break;
     case "review_notes":
-      next = changeResources(changeStats(next, { knowledge: 3, grit: 1 }), { energy: -5 });
+      next = changeResources(changeStats(next, { knowledge: 3, grit: 1 }), { energy: -6 });
       next = addAcademicPrep(next, "soc101", { reviewChunks: 5, focus: 2 });
       next = appendEvent(next, "Reviewed class notes in the dorm room.");
       break;
@@ -140,9 +141,32 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
       next = appendEvent(next, "Put the dorm room in better order.");
       break;
     case "sit_window":
-      next = changeResources(changeStats(next, { knowledge: 2 }), { energy: 2, money: -3 });
+      next = purchaseItem(next, "drip_coffee").state;
+      next = changeStats(next, { knowledge: 2 });
       next = addAcademicPrep(next, "soc101", { studyChunks: 3, focus: 1 });
       next = appendEvent(next, "Studied for a while in the coffee shop window booth.");
+      break;
+    case "order_drip":
+      next = purchaseItem(next, "drip_coffee").state;
+      break;
+    case "order_fancy":
+      next = purchaseItem(next, "fancy_latte").state;
+      break;
+    case "buy_pastry":
+      next = purchaseItem(next, "pastry").state;
+      break;
+    case "buy_snack_pack":
+      next = purchaseItem(next, "snack_pack").state;
+      break;
+    case "work_union_shift":
+      next = addTrait(changeResources(changeStats(next, { grit: 2, charm: 1 }), { energy: -18, money: 36 }), "worked-campus-shift");
+      next = appendEvent(next, "Worked a student union desk shift and got paid.");
+      notification = { app: "Anthrop", body: "Shift complete: +$36, -18 energy." };
+      break;
+    case "work_bookstore_shift":
+      next = addTrait(changeResources(changeStats(next, { grit: 2, knowledge: 1 }), { energy: -14, money: 28 }), "worked-bookstore-shift");
+      next = appendEvent(next, "Worked a short bookstore shelving shift and got paid.");
+      notification = { app: "Anthrop", body: "Shift complete: +$28, -14 energy." };
       break;
     case "chat_counter":
       next = changeStats(next, { charm: 2, sensitivity: 1 });
@@ -246,6 +270,10 @@ function getChoiceDurationChunks(choice: Choice) {
     review_notes: 6,
     tidy_room: 4,
     sit_window: 6,
+    order_drip: 1,
+    order_fancy: 1,
+    buy_pastry: 1,
+    buy_snack_pack: 1,
     chat_counter: 3,
     ask_mari_about_marcus: 3,
     ask_marcus_about_mari: 4,
@@ -253,6 +281,8 @@ function getChoiceDurationChunks(choice: Choice) {
     bulletin_study_group: 1,
     bulletin_club_fair: 1,
     bulletin_job_lead: 1,
+    work_union_shift: 12,
+    work_bookstore_shift: 8,
     look_around_location: 2,
     rest: 8,
     wait: 4,

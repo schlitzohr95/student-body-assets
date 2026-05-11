@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { getStudentUnionBulletinItems } from "../../engine/bulletin";
 import { getLocationDirectory, getNpcsAtLocation } from "../../engine/calendar";
+import { canPurchaseItem, describeItemEffects, getShopInventory, inventoryCount } from "../../engine/economy";
 import { getLocationKnowledge, hasKnownHours, isLocationVisible } from "../../engine/locationKnowledge";
 import { getTravelPlan } from "../../engine/travel";
 import type { Choice, GameState, LocationCategory, LocationId } from "../../types/game";
@@ -9,6 +10,7 @@ interface CompassAppProps {
   state: GameState;
   onNavigate: (location: LocationId) => void;
   onBulletinAction: (choice: Choice) => void | Promise<void>;
+  onPurchase: (itemId: string) => void;
 }
 
 const groups: Array<{ label: string; cat: LocationCategory }> = [
@@ -17,11 +19,13 @@ const groups: Array<{ label: string; cat: LocationCategory }> = [
   { label: "Outdoor", cat: "outdoor" },
 ];
 
-export function CompassApp({ state, onNavigate, onBulletinAction }: CompassAppProps) {
-  const [view, setView] = useState<"locations" | "bulletin">("locations");
+export function CompassApp({ state, onNavigate, onBulletinAction, onPurchase }: CompassAppProps) {
+  const [view, setView] = useState<"locations" | "bulletin" | "shop">("locations");
   const locations = getLocationDirectory(state);
   const canUseBulletin = state.location === "student_union";
   const bulletinItems = getStudentUnionBulletinItems(state);
+  const shopItems = getShopInventory(state);
+  const canUseShop = shopItems.length > 0;
 
   return (
     <div className="compass-app">
@@ -38,8 +42,17 @@ export function CompassApp({ state, onNavigate, onBulletinAction }: CompassAppPr
           >
             Bulletin
           </button>
+          <button
+            className={view === "shop" ? "is-active" : ""}
+            type="button"
+            disabled={!canUseShop}
+            onClick={() => setView("shop")}
+          >
+            Shop
+          </button>
         </div>
-        {!canUseBulletin && <span className="compass-app__hint">Bulletin unlocks at Student Union</span>}
+        {!canUseBulletin && !canUseShop && <span className="compass-app__hint">Shop and bulletin unlock at certain locations</span>}
+        {canUseShop && <span className="compass-app__hint">Shop stock follows your current location</span>}
       </header>
 
       {view === "locations" ? (
@@ -92,7 +105,7 @@ export function CompassApp({ state, onNavigate, onBulletinAction }: CompassAppPr
             </section>
           ))}
         </div>
-      ) : (
+      ) : view === "bulletin" ? (
         <section className="phone-panel compass-bulletin">
           <h2>Student Union Bulletin</h2>
           <div className="bulletin-list">
@@ -106,6 +119,29 @@ export function CompassApp({ state, onNavigate, onBulletinAction }: CompassAppPr
                 </button>
               </article>
             ))}
+          </div>
+        </section>
+      ) : (
+        <section className="phone-panel compass-shop">
+          <h2>{locations[state.location]?.label || state.location} Shop</h2>
+          <div className="shop-list">
+            {shopItems.map(item => {
+              const check = canPurchaseItem(state, item.id);
+              const owned = inventoryCount(state, item.id);
+              return (
+                <article className="shop-card" key={item.id}>
+                  <div>
+                    <small>{item.kind.toUpperCase()} · ${item.price}{owned ? ` · owned ${owned}` : ""}</small>
+                    <strong>{item.label}</strong>
+                    <p>{item.description}</p>
+                    <span>{describeItemEffects(item)}</span>
+                  </div>
+                  <button className="secondary-button" type="button" disabled={!check.ok} onClick={() => onPurchase(item.id)}>
+                    {check.ok ? "Buy" : check.reason}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         </section>
       )}

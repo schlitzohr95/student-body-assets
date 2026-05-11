@@ -57,7 +57,8 @@ export function getTravelPlan(
     };
   }
 
-  let durationChunks = catDistance(from?.cat, to?.cat);
+  const distance = catDistance(from?.cat, to?.cat);
+  let durationChunks = distance;
   let energyCost = Math.max(1, durationChunks);
   let moneyCost = 0;
   let mode: TravelPlan["mode"] = "Walk";
@@ -66,10 +67,11 @@ export function getTravelPlan(
     mode = "Bike";
     durationChunks = Math.max(1, durationChunks - 1);
     energyCost = Math.max(1, energyCost - 1);
-  } else if (hasBusPass(state) && durationChunks > 2) {
+  } else if ((hasBusPass(state) && durationChunks > 1) || durationChunks > 2) {
     mode = "Bus";
-    durationChunks = Math.max(1, durationChunks - 1);
+    durationChunks = Math.max(1, durationChunks - (distance > 2 ? 1 : 0));
     energyCost = 1;
+    moneyCost = hasBusPass(state) ? 0 : 2;
   }
 
   const canAfford = state.player.resources.money >= moneyCost;

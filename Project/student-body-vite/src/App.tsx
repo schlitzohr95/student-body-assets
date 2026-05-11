@@ -5,6 +5,7 @@ import { makeFreshState, normalizeState } from "./engine/state";
 import { addMarginNote, applyChoice, navigateToLocation, sendPulseMessage } from "./engine/transitions";
 import { applyWorldPack } from "./engine/worldPacks";
 import { submitAcademicTest } from "./engine/academics";
+import { purchaseItem } from "./engine/economy";
 import { maybeIssueCalendarReminder } from "./engine/calendar";
 import { deliverDuePulseReplies, markPulseThreadRead, type PulseTemplateId } from "./engine/pulse";
 import { sleepUntilAlarm } from "./engine/wake";
@@ -194,6 +195,15 @@ export default function App() {
     setGeneratedScene(null);
   }, [showNotification]);
 
+  const handlePurchaseItem = useCallback((itemId: string) => {
+    setState(current => {
+      if (!current) return current;
+      const update = purchaseItem(current, itemId);
+      if (update.notification) window.setTimeout(() => showNotification(update.notification!), 250);
+      return update.state;
+    });
+  }, [showNotification]);
+
   const handleSendMessage = useCallback((npcId: string, templateId: PulseTemplateId) => {
     if (!state) return;
     const update = sendPulseMessage(state, npcId, templateId);
@@ -282,7 +292,7 @@ export default function App() {
   if (phone.view.startsWith("app:")) {
     const appId = phone.view.slice(4);
     const app = APP_BY_ID[appId];
-    if (appId === "compass") phoneContent = <CompassApp state={state} onNavigate={handleNavigate} onBulletinAction={handleCompassBulletinAction} />;
+    if (appId === "compass") phoneContent = <CompassApp state={state} onNavigate={handleNavigate} onBulletinAction={handleCompassBulletinAction} onPurchase={handlePurchaseItem} />;
     else if (appId === "pulse") phoneContent = <PulseApp state={state} onSendMessage={handleSendMessage} onMarkRead={handleMarkPulseRead} />;
     else if (appId === "roster") phoneContent = <RosterApp state={state} />;
     else if (appId === "self") phoneContent = <SelfApp state={state} />;

@@ -16,6 +16,7 @@ export function makeFreshState(): GameState {
       name: "You",
       stats: { knowledge: 30, athletics: 25, charm: 35, sensitivity: 40, grit: 30 },
       resources: { energy: 80, money: 50 },
+      inventory: {},
       traits: [],
       relationships: {
         roommate: {
@@ -95,6 +96,7 @@ export function normalizeState(state: GameState): GameState {
       ...state.player,
       stats: { ...fresh.player.stats, ...state.player?.stats },
       resources: { ...fresh.player.resources, ...state.player?.resources },
+      inventory: state.player?.inventory || {},
       traits: state.player?.traits || [],
       relationships: normalizeRelationships(mergedForRelationshipNormalization),
     },
