@@ -1,5 +1,6 @@
 import type { Choice, GameState } from "../types/game";
 import { formatCalendarEventTime, getUpcomingCalendarEvents } from "./calendar";
+import { normalizeBulletinPosts } from "./worldPacks";
 
 export interface BulletinItem {
   id: string;
@@ -33,6 +34,13 @@ const STATIC_BULLETINS: BulletinItem[] = [
   },
 ];
 
+function bulletinIsVisible(state: GameState, post: { day?: number; slot?: number }) {
+  if (typeof post.day !== "number") return true;
+  if (post.day < state.day) return true;
+  if (post.day > state.day) return false;
+  return typeof post.slot !== "number" || post.slot <= state.timeSlot;
+}
+
 export function getStudentUnionBulletinItems(state: GameState): BulletinItem[] {
   const calendarItems = getUpcomingCalendarEvents(state, 96 * 7)
     .filter(event => event.location === "student_union")
@@ -44,6 +52,15 @@ export function getStudentUnionBulletinItems(state: GameState): BulletinItem[] {
       body: `${formatCalendarEventTime(event)}. ${event.description || "Posted on the Union board."}`,
       action: { id: `bulletin_event_${event.id}`, label: "Pin this event" },
     }));
+  const importedItems = normalizeBulletinPosts(state.world?.bulletinPosts || state.world?.bulletins)
+    .filter(post => bulletinIsVisible(state, post))
+    .map(post => ({
+      id: `pack-${post.id}`,
+      kicker: post.kicker || "Campus",
+      title: post.title,
+      body: post.body,
+      action: post.action || { id: `bulletin_pack_${post.id}`, label: "Pin this lead" },
+    }));
 
-  return [...calendarItems, ...STATIC_BULLETINS].slice(0, 5);
+  return [...calendarItems, ...importedItems, ...STATIC_BULLETINS].slice(0, 7);
 }

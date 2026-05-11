@@ -269,6 +269,9 @@ export default function App() {
         scheduleCount: 0,
         arcCount: 0,
         eventCount: 0,
+        courseCount: 0,
+        testCount: 0,
+        bulletinCount: 0,
         relationshipCount: 0,
         knownLocationCount: 0,
         rumoredLocationCount: 0,
@@ -281,6 +284,9 @@ export default function App() {
     setState(normalizeState(result.state));
     const extras = [
       result.summary.relationshipCount ? `${result.summary.relationshipCount} relationships` : "",
+      result.summary.courseCount ? `${result.summary.courseCount} courses` : "",
+      result.summary.testCount ? `${result.summary.testCount} tests` : "",
+      result.summary.bulletinCount ? `${result.summary.bulletinCount} bulletins` : "",
       result.summary.knownLocationCount || result.summary.rumoredLocationCount ? `${result.summary.knownLocationCount + result.summary.rumoredLocationCount} intel` : "",
       result.summary.warningCount ? `${result.summary.warningCount} warnings` : "",
     ].filter(Boolean).join(", ");

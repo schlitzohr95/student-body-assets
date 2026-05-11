@@ -1,0 +1,213 @@
+{
+  "id": "honors-pressure",
+  "name": "Honors Pressure",
+  "version": "0.1.0",
+  "author": "Student Body dev pack",
+  "description": "A campus flavor pack about high-achieving students, STEM pressure, hidden study spaces, and controlled academic panic.",
+  "npcs": {
+    "honors_tutor": {
+      "id": "honors_tutor",
+      "name": "Priya Shah",
+      "portraitKey": "ra",
+      "archetype": "Honors Tutor",
+      "role": "Peer tutor who can diagnose a study problem faster than most people can describe it",
+      "defaultLocation": "honors_lounge",
+      "currentLocation": "honors_lounge",
+      "schema": {
+        "ageBand": "older student",
+        "publicFace": "Polished, direct, quietly kind when effort is real.",
+        "voice": "Precise, brisk, with gentle pressure disguised as practical advice.",
+        "wants": ["Students to ask before spiraling", "Better study systems", "People who stop confusing panic with rigor"],
+        "whatLands": ["Prepared questions", "Owning weak spots", "Following a study plan"],
+        "whatFallsFlat": ["Grade theater", "Humblebragging", "Pretending not to need help"],
+        "boundaries": ["Tutoring is not therapy", "She will not do the work for anyone"]
+      },
+      "currentMood": "Calmly sorting a waitlist and noticing who is pretending to be fine.",
+      "lastSeenDisposition": "Not yet met."
+    },
+    "lab_partner": {
+      "id": "lab_partner",
+      "name": "Evan Ortiz",
+      "portraitKey": "wildcard",
+      "archetype": "Lab Partner",
+      "role": "Bio lab partner with careful hands and a habit of overchecking everything",
+      "defaultLocation": "research_lab",
+      "currentLocation": "research_lab",
+      "schema": {
+        "ageBand": "adult peer",
+        "publicFace": "Quiet, competent, visibly tense around messy collaboration.",
+        "voice": "Measured, tentative, more relaxed when facts are clear.",
+        "wants": ["A lab partner who records things accurately", "Less chaos around group work", "Proof that social ease is not the same as reliability"],
+        "whatLands": ["Careful notes", "Admitting errors early", "Respecting equipment"],
+        "whatFallsFlat": ["Guessing with confidence", "Touching samples before reading", "Turning mistakes into jokes too fast"],
+        "boundaries": ["Lab safety is not flirtation material"]
+      },
+      "currentMood": "Triple-checking labels and trying not to make it everyone else's problem.",
+      "lastSeenDisposition": "Not yet met."
+    }
+  },
+  "locations": {
+    "honors_lounge": {
+      "id": "honors_lounge",
+      "label": "Honors Lounge",
+      "cat": "campus",
+      "description": "A quiet lounge with whiteboards, cold coffee, and the brittle calm of people managing expectations.",
+      "hours": "Daily 7:00 AM-11:00 PM",
+      "hiddenUntilDiscovered": true
+    },
+    "research_lab": {
+      "id": "research_lab",
+      "label": "Research Lab",
+      "cat": "campus",
+      "description": "A teaching lab of labeled drawers, shared benches, and the smell of gloves and procedure.",
+      "hours": "Scheduled labs and supervised study",
+      "hiddenUntilDiscovered": true
+    }
+  },
+  "academicCourses": {
+    "bio110": {
+      "id": "bio110",
+      "code": "BIO 110",
+      "title": "Intro Biology Lab",
+      "instructor": "Dr. Maren Cole",
+      "location": "research_lab",
+      "meetingDays": [2, 5, 9, 12, 16, 19, 23, 26],
+      "summary": "Lab methods, observation discipline, and the fragile difference between data and a confident guess.",
+      "stakes": "Good lab work can unlock tutoring help, research leads, and smoother partner dynamics."
+    }
+  },
+  "academicTests": {
+    "bio110_lab_practical": {
+      "id": "bio110_lab_practical",
+      "courseId": "bio110",
+      "courseTitle": "Intro Biology Lab",
+      "label": "Lab Practical",
+      "day": 12,
+      "startSlot": 40,
+      "endSlot": 45,
+      "location": "research_lab",
+      "baseDifficulty": 8,
+      "minQuestions": 3,
+      "questions": [
+        {
+          "id": "control_group",
+          "type": "multiple_choice",
+          "prompt": "Why does a simple experiment need a control group?",
+          "hint": "You need a comparison.",
+          "skill": "knowledge",
+          "options": [
+            { "id": "compare", "label": "To compare what changes against what does not", "correct": true },
+            { "id": "decorate", "label": "To make the lab report longer" },
+            { "id": "hide", "label": "To hide uncertain data" },
+            { "id": "random", "label": "To avoid writing a hypothesis" }
+          ],
+          "explanation": "A control group anchors comparison, making it easier to interpret whether an intervention mattered."
+        },
+        {
+          "id": "lab_safety_order",
+          "type": "order",
+          "prompt": "Put the lab response in the safest order after noticing a mislabeled sample.",
+          "hint": "Stop, tell someone, then fix the record.",
+          "skill": "grit",
+          "options": [
+            { "id": "document", "label": "Document the correction" },
+            { "id": "stop", "label": "Stop using the sample" },
+            { "id": "notify", "label": "Notify the instructor or TA" },
+            { "id": "isolate", "label": "Isolate the questionable sample" }
+          ],
+          "correctAnswers": ["stop", "isolate", "notify", "document"],
+          "explanation": "Safe lab work pauses the problem, isolates risk, tells the responsible person, and documents the fix."
+        },
+        {
+          "id": "observation_vs_inference",
+          "type": "short_text",
+          "prompt": "Type the word for what you directly see or measure before interpretation.",
+          "hint": "It is not the conclusion.",
+          "skill": "knowledge",
+          "correctAnswers": ["observation", "data", "measurement"],
+          "explanation": "Observation and data come before inference; mixing them is where lab trouble starts."
+        }
+      ]
+    }
+  },
+  "npcSchedules": {
+    "honors_tutor": {
+      "weekday": [
+        { "start": "16:00", "end": "18:00", "location": "honors_lounge", "mood": "running drop-in tutoring" },
+        { "start": "20:00", "end": "21:00", "location": "library_main", "mood": "reviewing notes" }
+      ]
+    },
+    "lab_partner": {
+      "tuesday": [
+        { "start": "10:00", "end": "12:00", "location": "research_lab", "mood": "in lab" }
+      ],
+      "friday": [
+        { "start": "10:00", "end": "12:00", "location": "research_lab", "mood": "in lab" }
+      ]
+    }
+  },
+  "calendarEvents": [
+    {
+      "id": "honors_tutoring_dropin",
+      "title": "Honors Tutoring Drop-In",
+      "kind": "class",
+      "day": 3,
+      "startSlot": 64,
+      "endSlot": 72,
+      "location": "honors_lounge",
+      "description": "Priya is helping people turn panic into study plans.",
+      "npcIds": ["honors_tutor"]
+    }
+  ],
+  "bulletinPosts": [
+    {
+      "id": "honors-dropin",
+      "kicker": "Academic",
+      "title": "Honors tutoring drop-in",
+      "body": "Bring one actual question. Priya says 'I am lost' counts if you can point to where it started.",
+      "action": { "id": "bulletin_pack_honors_dropin", "label": "Pin tutoring drop-in" }
+    },
+    {
+      "id": "lab-partner-form",
+      "kicker": "Lab",
+      "title": "Lab partner preference form",
+      "body": "The bio lab is asking students to list schedule conflicts before teams lock for the practical.",
+      "day": 2,
+      "slot": 36,
+      "action": { "id": "bulletin_pack_lab_partner_form", "label": "Pin lab reminder" }
+    }
+  ],
+  "arcs": [
+    {
+      "id": "pressure_systems",
+      "label": "Pressure Systems",
+      "type": "academic",
+      "beats": [
+        { "id": "tutor_dropin_seen", "trigger": "pin_honors_dropin", "npcIds": ["honors_tutor"] },
+        { "id": "lab_partner_trust", "trigger": "pass_lab_practical_or_admit_error", "npcIds": ["lab_partner"] }
+      ]
+    }
+  ],
+  "knownNpcIds": ["honors_tutor"],
+  "knownLocationIds": ["honors_lounge"],
+  "rumoredLocationIds": ["research_lab"],
+  "relationships": {
+    "honors_tutor": {
+      "score": 1,
+      "status": "academic support",
+      "traits": ["precise", "steady"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Likely to help if you bring a real question."
+    },
+    "lab_partner": {
+      "score": 0,
+      "status": "future classmate",
+      "traits": ["careful", "anxious"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Unknown beyond a name on the lab roster."
+    }
+  },
+  "flags": {
+    "world_pack_honors_pressure": true
+  }
+}

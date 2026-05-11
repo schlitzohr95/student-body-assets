@@ -18,6 +18,24 @@
       "npcCount": 3,
       "locationCount": 3,
       "tags": ["town", "discovery", "relationships", "calendar"]
+    },
+    {
+      "id": "arts-and-activism",
+      "name": "Arts And Activism",
+      "description": "A campus flavor pack with studio spaces, organizers, an arts course, a test, bulletin posts, and social arcs.",
+      "path": "/world-packs/arts-and-activism.json",
+      "npcCount": 2,
+      "locationCount": 2,
+      "tags": ["arts", "activism", "classes", "bulletins"]
+    },
+    {
+      "id": "honors-pressure",
+      "name": "Honors Pressure",
+      "description": "A higher-pressure academic flavor pack with honors spaces, STEM prep, tests, and bulletin hooks.",
+      "path": "/world-packs/honors-pressure.json",
+      "npcCount": 2,
+      "locationCount": 2,
+      "tags": ["honors", "academics", "tests", "bulletins"]
     }
   ]
 }

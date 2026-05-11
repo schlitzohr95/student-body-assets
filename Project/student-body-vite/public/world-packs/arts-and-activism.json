@@ -1,0 +1,213 @@
+{
+  "id": "arts-and-activism",
+  "name": "Arts And Activism",
+  "version": "0.1.0",
+  "author": "Student Body dev pack",
+  "description": "A campus flavor pack focused on print culture, performance spaces, soft activism, and creative academic pressure.",
+  "npcs": {
+    "zine_editor": {
+      "id": "zine_editor",
+      "name": "Rae Kim",
+      "portraitKey": "artistic",
+      "archetype": "Organizer",
+      "role": "Zine editor who turns every flyer table into a tiny argument about campus power",
+      "defaultLocation": "print_lab",
+      "currentLocation": "print_lab",
+      "schema": {
+        "ageBand": "adult peer",
+        "publicFace": "Sharp, funny, quick to recruit people who seem awake.",
+        "voice": "Fast, vivid, and allergic to vague agreement.",
+        "wants": ["People who show up after signing up", "A zine issue that is not just complaints", "Fresh eyes on campus rituals"],
+        "whatLands": ["Specific observations", "Useful follow-through", "Admitting uncertainty"],
+        "whatFallsFlat": ["Performative outrage", "Making activism a personality costume", "Flaking after public enthusiasm"],
+        "boundaries": ["Names stay out of print without consent", "Labor matters more than aesthetics"]
+      },
+      "currentMood": "Ink-stained, focused, and willing to test whether a newcomer means it.",
+      "lastSeenDisposition": "Not yet met."
+    },
+    "stage_manager": {
+      "id": "stage_manager",
+      "name": "Noah Bell",
+      "portraitKey": "wildcard",
+      "archetype": "Theater",
+      "role": "Black box stage manager who knows every quiet crisis before it becomes visible",
+      "defaultLocation": "black_box",
+      "currentLocation": "black_box",
+      "schema": {
+        "ageBand": "adult peer",
+        "publicFace": "Composed, observant, more tired than dramatic.",
+        "voice": "Dry, logistical, with sudden private warmth.",
+        "wants": ["Reliable hands", "People who can take notes without making everything about them", "A clean rehearsal week"],
+        "whatLands": ["Being early", "Fixing small problems", "Respecting backstage space"],
+        "whatFallsFlat": ["Main-character energy", "Touching props without asking", "Offering help then disappearing"],
+        "boundaries": ["Backstage is work space", "Cast gossip is not currency"]
+      },
+      "currentMood": "Counting chairs and silently recalculating a lighting cue.",
+      "lastSeenDisposition": "Not yet met."
+    }
+  },
+  "locations": {
+    "print_lab": {
+      "id": "print_lab",
+      "label": "Print Lab",
+      "cat": "campus",
+      "description": "A narrow room of risograph hum, paper stacks, drying zines, and conversations that become plans.",
+      "hours": "Weekdays 1:00 PM-9:00 PM",
+      "hiddenUntilDiscovered": true
+    },
+    "black_box": {
+      "id": "black_box",
+      "label": "Black Box Theater",
+      "cat": "campus",
+      "description": "A flexible theater space where taped floor marks and quiet tech crews decide what the audience will feel.",
+      "hours": "Posted rehearsals and performances",
+      "hiddenUntilDiscovered": true
+    }
+  },
+  "academicCourses": {
+    "art101": {
+      "id": "art101",
+      "code": "ART 101",
+      "title": "Visual Culture Lab",
+      "instructor": "Prof. Celia Voss",
+      "location": "print_lab",
+      "meetingDays": [2, 4, 9, 11, 16, 18, 23, 25],
+      "summary": "How images, flyers, posters, and student media make social worlds feel natural or contested.",
+      "stakes": "Strong work opens zine leads, gallery prep, and a sharper read on campus performance."
+    }
+  },
+  "academicTests": {
+    "art101_visual_reading": {
+      "id": "art101_visual_reading",
+      "courseId": "art101",
+      "courseTitle": "Visual Culture Lab",
+      "label": "Visual Reading Check",
+      "day": 10,
+      "startSlot": 56,
+      "endSlot": 60,
+      "location": "print_lab",
+      "baseDifficulty": 6,
+      "minQuestions": 3,
+      "questions": [
+        {
+          "id": "poster_audience",
+          "type": "multiple_choice",
+          "prompt": "A campus poster uses tiny dense text and no date until the bottom corner. What is the strongest design problem?",
+          "hint": "Think about what the viewer needs first.",
+          "skill": "sensitivity",
+          "options": [
+            { "id": "hierarchy", "label": "Weak information hierarchy", "correct": true },
+            { "id": "palette", "label": "Too many paper fibers" },
+            { "id": "consent", "label": "Missing interview consent" },
+            { "id": "sampling", "label": "Unrepresentative sample" }
+          ],
+          "explanation": "Information hierarchy shapes what a viewer can understand quickly."
+        },
+        {
+          "id": "visual_culture_short",
+          "type": "short_text",
+          "prompt": "Type the word for treating an image or object as something that carries social meaning.",
+          "hint": "The course title gives you one of the words.",
+          "skill": "knowledge",
+          "correctAnswers": ["visual culture", "culture", "visual"],
+          "explanation": "Visual culture work reads images and objects as social evidence, not decoration."
+        },
+        {
+          "id": "zine_ethics",
+          "type": "multi_select",
+          "prompt": "Select the choices that fit ethical campus zine work.",
+          "hint": "Consent and specificity beat easy exposure.",
+          "skill": "grit",
+          "options": [
+            { "id": "consent", "label": "Get consent before naming people", "correct": true },
+            { "id": "specific", "label": "Use specific observations", "correct": true },
+            { "id": "rumor", "label": "Print rumors if they sound true" },
+            { "id": "flatten", "label": "Flatten every story into a slogan" }
+          ],
+          "correctAnswers": ["consent", "specific"],
+          "explanation": "Ethical student media protects people while still being specific enough to matter."
+        }
+      ]
+    }
+  },
+  "npcSchedules": {
+    "zine_editor": {
+      "weekday": [
+        { "start": "15:00", "end": "18:30", "location": "print_lab", "mood": "laying out pages" },
+        { "start": "19:00", "end": "20:00", "location": "student_union", "mood": "recruiting contributors" }
+      ]
+    },
+    "stage_manager": {
+      "weekday": [
+        { "start": "18:00", "end": "21:30", "location": "black_box", "mood": "running rehearsal" }
+      ],
+      "weekend": [
+        { "start": "13:00", "end": "16:00", "location": "black_box", "mood": "resetting the space" }
+      ]
+    }
+  },
+  "calendarEvents": [
+    {
+      "id": "zine_pitch_meetup",
+      "title": "Zine Pitch Meetup",
+      "kind": "social",
+      "day": 6,
+      "startSlot": 76,
+      "endSlot": 82,
+      "location": "student_union",
+      "description": "Rae is collecting tiny campus observations for the first issue.",
+      "npcIds": ["zine_editor"]
+    }
+  ],
+  "bulletinPosts": [
+    {
+      "id": "zine-call",
+      "kicker": "Arts",
+      "title": "First issue zine call",
+      "body": "Rae needs one-paragraph observations about first-week rituals. Anonymous is fine. Specific is better.",
+      "action": { "id": "bulletin_pack_zine_call", "label": "Pin the zine call" }
+    },
+    {
+      "id": "black-box-hands",
+      "kicker": "Theater",
+      "title": "Black box needs hands",
+      "body": "Noah is looking for two people who can move chairs quietly and not improvise with equipment.",
+      "day": 2,
+      "slot": 48,
+      "action": { "id": "bulletin_pack_black_box_hands", "label": "Pin the crew lead" }
+    }
+  ],
+  "arcs": [
+    {
+      "id": "first_issue",
+      "label": "First Issue",
+      "type": "creative",
+      "beats": [
+        { "id": "zine_call_seen", "trigger": "pin_zine_call", "npcIds": ["zine_editor"] },
+        { "id": "submit_observation", "trigger": "margin_note_linked_to_zine", "npcIds": ["zine_editor"] }
+      ]
+    }
+  ],
+  "knownNpcIds": ["zine_editor"],
+  "knownLocationIds": ["print_lab"],
+  "rumoredLocationIds": ["black_box"],
+  "relationships": {
+    "zine_editor": {
+      "score": 1,
+      "status": "creative lead",
+      "traits": ["sharp", "recruiting"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Interested if you can be specific without performing."
+    },
+    "stage_manager": {
+      "score": 0,
+      "status": "rumored contact",
+      "traits": ["reliable", "observant"],
+      "flags": { "trust": 0, "awkward": 0, "texting": false, "date_planned": false },
+      "lastSeenDisposition": "Known through crew-board warnings and practical notes."
+    }
+  },
+  "flags": {
+    "world_pack_arts_and_activism": true
+  }
+}

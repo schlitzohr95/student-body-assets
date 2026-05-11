@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
-import { ACADEMIC_COURSES } from "../../data/academics";
 import { STARTER_NPCS } from "../../data/npcs";
+import { getAcademicCourses } from "../../engine/academics";
 import { getLocationDirectory } from "../../engine/calendar";
 import type { GameNote, GameState } from "../../types/game";
 import { eventSummary, formatMoment, noteMoment } from "../format";
@@ -32,6 +32,7 @@ export function MarginApp({ state, onAddNote }: MarginAppProps) {
   const [linkId, setLinkId] = useState("");
   const recentEvents = state.eventLog.slice(-12).reverse();
   const locations = useMemo(() => getLocationDirectory(state), [state]);
+  const courses = useMemo(() => getAcademicCourses(state), [state]);
   const filteredNotes = state.notes.filter(note => noteMatches(note, query)).slice().reverse();
 
   const linkOptions = useMemo(() => {
@@ -39,7 +40,7 @@ export function MarginApp({ state, onAddNote }: MarginAppProps) {
       return state.npcsKnown.map(id => ({ id, label: state.npcDirectory?.[id]?.name || STARTER_NPCS[id]?.name || id }));
     }
     if (linkMode === "class") {
-      return ACADEMIC_COURSES.map(course => ({ id: course.id, label: `${course.code}: ${course.title}` }));
+      return courses.map(course => ({ id: course.id, label: `${course.code}: ${course.title}` }));
     }
     if (linkMode === "location") {
       return Object.values(locations).map(location => ({ id: location.id, label: location.label }));
@@ -51,7 +52,7 @@ export function MarginApp({ state, onAddNote }: MarginAppProps) {
       }));
     }
     return [];
-  }, [linkMode, locations, recentEvents, state.day, state.npcDirectory, state.npcsKnown]);
+  }, [courses, linkMode, locations, recentEvents, state.day, state.npcDirectory, state.npcsKnown]);
 
   const submitNote = () => {
     if (!draft.trim()) return;

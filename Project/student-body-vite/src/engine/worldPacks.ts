@@ -1,6 +1,10 @@
 import { LOCATIONS } from "../data/locations";
 import { STARTER_NPCS } from "../data/npcs";
 import type {
+  AcademicCourseDefinition,
+  AcademicQuestion,
+  AcademicTestDefinition,
+  BulletinPostDefinition,
   CalendarEvent,
   GameState,
   LocationCategory,
@@ -40,6 +44,9 @@ export interface WorldPackImportSummary {
   scheduleCount: number;
   arcCount: number;
   eventCount: number;
+  courseCount: number;
+  testCount: number;
+  bulletinCount: number;
   relationshipCount: number;
   knownLocationCount: number;
   rumoredLocationCount: number;
@@ -122,6 +129,130 @@ export function normalizeLocationMap(source: unknown): Record<LocationId, Locati
   return next;
 }
 
+export function normalizeAcademicCourseMap(source: unknown): Record<string, AcademicCourseDefinition> {
+  const next: Record<string, AcademicCourseDefinition> = {};
+
+  const addCourse = (key: string, value: unknown) => {
+    if (!isRecord(value)) return;
+    const id = stringValue(value.id, key);
+    if (!id) return;
+    const meetingDays = Array.isArray(value.meetingDays)
+      ? value.meetingDays.map(Number).filter(Number.isFinite)
+      : [];
+    next[id] = {
+      id,
+      code: stringValue(value.code, id.toUpperCase()),
+      title: stringValue(value.title, stringValue(value.name, id)),
+      instructor: stringValue(value.instructor, "TBA"),
+      location: stringValue(value.location, "lecture_hall"),
+      meetingDays,
+      summary: stringValue(value.summary, "No course summary authored yet."),
+      stakes: stringValue(value.stakes, "No stakes authored yet."),
+    };
+  };
+
+  if (Array.isArray(source)) {
+    source.forEach((item, index) => addCourse(isRecord(item) ? stringValue(item.id, `course_${index + 1}`) : `course_${index + 1}`, item));
+    return next;
+  }
+
+  if (isRecord(source)) {
+    Object.entries(source).forEach(([key, value]) => addCourse(key, value));
+  }
+
+  return next;
+}
+
+function normalizeQuestion(source: unknown, fallbackId: string): AcademicQuestion | null {
+  if (!isRecord(source)) return null;
+  const id = stringValue(source.id, fallbackId);
+  const prompt = stringValue(source.prompt);
+  const explanation = stringValue(source.explanation, "No explanation authored yet.");
+  if (!id || !prompt) return null;
+  return {
+    id,
+    type: source.type as AcademicQuestion["type"],
+    prompt,
+    options: Array.isArray(source.options) ? source.options as AcademicQuestion["options"] : undefined,
+    correctAnswers: Array.isArray(source.correctAnswers) ? source.correctAnswers.filter((item): item is string => typeof item === "string") : undefined,
+    explanation,
+    hint: stringValue(source.hint) || undefined,
+    skill: source.skill as AcademicQuestion["skill"],
+  };
+}
+
+export function normalizeAcademicTestMap(source: unknown): Record<string, AcademicTestDefinition> {
+  const next: Record<string, AcademicTestDefinition> = {};
+
+  const addTest = (key: string, value: unknown) => {
+    if (!isRecord(value)) return;
+    const id = stringValue(value.id, key);
+    const questions = Array.isArray(value.questions)
+      ? value.questions.map((question, index) => normalizeQuestion(question, `${id}_q${index + 1}`)).filter(Boolean) as AcademicQuestion[]
+      : [];
+    if (!id) return;
+    next[id] = {
+      id,
+      courseId: stringValue(value.courseId, "soc101"),
+      courseTitle: stringValue(value.courseTitle, stringValue(value.courseName, stringValue(value.courseId, "Course"))),
+      label: stringValue(value.label, stringValue(value.title, id)),
+      day: typeof value.day === "number" ? value.day : 1,
+      startSlot: typeof value.startSlot === "number" ? value.startSlot : undefined,
+      endSlot: typeof value.endSlot === "number" ? value.endSlot : undefined,
+      location: stringValue(value.location, "lecture_hall"),
+      baseDifficulty: typeof value.baseDifficulty === "number" ? value.baseDifficulty : 6,
+      minQuestions: typeof value.minQuestions === "number" ? value.minQuestions : undefined,
+      questions,
+    };
+  };
+
+  if (Array.isArray(source)) {
+    source.forEach((item, index) => addTest(isRecord(item) ? stringValue(item.id, `test_${index + 1}`) : `test_${index + 1}`, item));
+    return next;
+  }
+
+  if (isRecord(source)) {
+    Object.entries(source).forEach(([key, value]) => addTest(key, value));
+  }
+
+  return next;
+}
+
+export function normalizeBulletinPosts(source: unknown): BulletinPostDefinition[] {
+  const posts: BulletinPostDefinition[] = [];
+
+  const addPost = (key: string, value: unknown) => {
+    if (!isRecord(value)) return;
+    const id = stringValue(value.id, key);
+    const title = stringValue(value.title);
+    const body = stringValue(value.body, stringValue(value.text));
+    if (!id || !title || !body) return;
+    posts.push({
+      id,
+      kicker: stringValue(value.kicker, stringValue(value.tag, "Campus")),
+      title,
+      body,
+      day: typeof value.day === "number" ? value.day : undefined,
+      slot: typeof value.slot === "number" ? value.slot : undefined,
+      action: isRecord(value.action) && typeof value.action.id === "string" && typeof value.action.label === "string"
+        ? { id: value.action.id, label: value.action.label }
+        : undefined,
+      source: stringValue(value.source) || undefined,
+    });
+  };
+
+  if (Array.isArray(source)) {
+    source.forEach((item, index) => addPost(isRecord(item) ? stringValue(item.id, `bulletin_${index + 1}`) : `bulletin_${index + 1}`, item));
+    return posts;
+  }
+
+  if (isRecord(source)) {
+    Object.entries(source).forEach(([key, value]) => addPost(key, value));
+  }
+
+  return posts;
+}
+
 function mergeRecords<T>(base: T[] | Record<string, T> | undefined, next: Record<string, T>) {
   return { ...(Array.isArray(base) ? Object.fromEntries(base.map(item => [(item as { id?: string }).id, item]).filter(([id]) => id)) : base || {}), ...next };
 }
@@ -195,6 +326,29 @@ function normalizeRelationshipSeeds(pack: WorldPack): Record<NpcId, Relationship
   };
 }
 
+function normalizePackAcademicCourses(pack: WorldPack): Record<string, AcademicCourseDefinition> {
+  return {
+    ...normalizeAcademicCourseMap(pack.academicCourses),
+    ...normalizeAcademicCourseMap(pack.courses),
+    ...normalizeAcademicCourseMap(pack.classes),
+  };
+}
+
+function normalizePackAcademicTests(pack: WorldPack): Record<string, AcademicTestDefinition> {
+  return {
+    ...normalizeAcademicTestMap(pack.academicTests),
+    ...normalizeAcademicTestMap(pack.tests),
+  };
+}
+
+function normalizePackBulletins(pack: WorldPack): BulletinPostDefinition[] {
+  const posts = [
+    ...normalizeBulletinPosts(pack.bulletinPosts),
+    ...normalizeBulletinPosts(pack.bulletins),
+  ];
+  return posts.filter((post, index, all) => all.findIndex(item => item.id === post.id) === index);
+}
+
 function scheduleBlocks(source: unknown): Array<Record<string, unknown>> {
   if (Array.isArray(source)) return source.filter(isRecord);
   if (!isRecord(source)) return [];
@@ -244,6 +398,9 @@ export function validateWorldPack(pack: WorldPack): WorldPackValidationIssue[] {
   };
   const schedules = { ...(isRecord(pack.schedules) ? pack.schedules : {}), ...(isRecord(pack.npcSchedules) ? pack.npcSchedules : {}) };
   const relationships = normalizeRelationshipSeeds(pack);
+  const academicCourses = normalizePackAcademicCourses(pack);
+  const academicTests = normalizePackAcademicTests(pack);
+  const bulletinPosts = normalizePackBulletins(pack);
   const knownLocationIds = normalizeIdList(pack.knownLocationIds);
   const rumoredLocationIds = normalizeIdList(pack.rumoredLocationIds);
   const calendarSources = calendarEventSources(pack);
@@ -254,11 +411,14 @@ export function validateWorldPack(pack: WorldPack): WorldPackValidationIssue[] {
     + validCalendarEvents.length
     + arcCount(pack.arcs ?? pack.storyArcs)
     + Object.keys(relationships).length
+    + Object.keys(academicCourses).length
+    + Object.keys(academicTests).length
+    + bulletinPosts.length
     + knownLocationIds.length
     + rumoredLocationIds.length;
 
   if (!importableCount) {
-    issues.push(issue("error", "$", "Pack did not contain importable NPCs, locations, schedules, relationships, calendar events, arcs, or discovery seeds."));
+    issues.push(issue("error", "$", "Pack did not contain importable NPCs, locations, schedules, relationships, courses, tests, bulletin posts, calendar events, arcs, or discovery seeds."));
   }
 
   for (const [npcId, npc] of Object.entries(npcs)) {
@@ -300,6 +460,45 @@ export function validateWorldPack(pack: WorldPack): WorldPackValidationIssue[] {
     }
   }
 
+  for (const [courseId, course] of Object.entries(academicCourses)) {
+    if (!course.code || !course.title) {
+      issues.push(issue("warning", `courses.${courseId}`, "Course is missing code or title."));
+    }
+    if (course.location && !hasLocationId(course.location, locations)) {
+      issues.push(issue("warning", `courses.${courseId}.location`, `Course references unknown location "${course.location}".`));
+    }
+    if (!course.meetingDays.length) {
+      issues.push(issue("warning", `courses.${courseId}.meetingDays`, "Course has no meeting days, so it will not create class rhythm by itself."));
+    }
+  }
+
+  for (const [testId, test] of Object.entries(academicTests)) {
+    if (!academicCourses[test.courseId] && test.courseId !== "soc101") {
+      issues.push(issue("warning", `tests.${testId}.courseId`, `Test references course "${test.courseId}" that is not defined in this pack or built in.`));
+    }
+    if (test.location && !hasLocationId(test.location, locations)) {
+      issues.push(issue("warning", `tests.${testId}.location`, `Test references unknown location "${test.location}".`));
+    }
+    if (!test.questions.length) {
+      issues.push(issue("error", `tests.${testId}.questions`, "Test has no valid questions and cannot be used by Spark."));
+    }
+    for (const [index, question] of test.questions.entries()) {
+      const questionPath = `tests.${testId}.questions.${index}`;
+      if ((question.type === "short_text" || question.type === "multi_select" || question.type === "order") && !question.correctAnswers?.length) {
+        issues.push(issue("warning", `${questionPath}.correctAnswers`, "Question type should define correctAnswers."));
+      }
+      if ((question.type === "multiple_choice" || !question.type) && !question.options?.some(option => option.correct)) {
+        issues.push(issue("warning", `${questionPath}.options`, "Multiple-choice question has no option marked correct."));
+      }
+    }
+  }
+
+  for (const [index, post] of bulletinPosts.entries()) {
+    if (!post.title || !post.body) {
+      issues.push(issue("warning", `bulletinPosts.${index}`, "Bulletin post is missing title or body."));
+    }
+  }
+
   for (let index = 0; index < calendarSources.length; index += 1) {
     const rawEvent = calendarSources[index];
     if (!isRecord(rawEvent)) {
@@ -332,6 +531,9 @@ export function summarizeWorldPack(pack: WorldPack, sourceFileName?: string): Wo
   const arcs = pack.arcs ?? pack.storyArcs;
   const calendarEvents = normalizeCalendarEvents(pack);
   const relationships = normalizeRelationshipSeeds(pack);
+  const academicCourses = normalizePackAcademicCourses(pack);
+  const academicTests = normalizePackAcademicTests(pack);
+  const bulletinPosts = normalizePackBulletins(pack);
   const knownLocationIds = normalizeIdList(pack.knownLocationIds);
   const rumoredLocationIds = normalizeIdList(pack.rumoredLocationIds);
   const issues = validateWorldPack(pack);
@@ -343,6 +545,9 @@ export function summarizeWorldPack(pack: WorldPack, sourceFileName?: string): Wo
     scheduleCount: objectSize(schedules),
     arcCount: arcCount(arcs),
     eventCount: calendarEvents.length,
+    courseCount: Object.keys(academicCourses).length,
+    testCount: Object.keys(academicTests).length,
+    bulletinCount: bulletinPosts.length,
     relationshipCount: Object.keys(relationships).length,
     knownLocationCount: knownLocationIds.length,
     rumoredLocationCount: rumoredLocationIds.length,
@@ -350,6 +555,12 @@ export function summarizeWorldPack(pack: WorldPack, sourceFileName?: string): Wo
     errorCount: issues.filter(item => item.severity === "error").length,
     issues,
   };
+}
+
+export function worldPackErrorMessage(summary: WorldPackImportSummary) {
+  const errors = summary.issues.filter(item => item.severity === "error");
+  if (!errors.length) return "";
+  return `World pack "${summary.name}" has ${errors.length} import error${errors.length === 1 ? "" : "s"}: ${errors.map(item => `${item.path} - ${item.message}`).join("; ")}`;
 }
 
 function nextDiscoveryState(current: LocationKnowledgeRecord | undefined, target: LocationDiscoveryState) {
@@ -399,10 +610,14 @@ export function applyWorldPack(state: GameState, pack: WorldPack, sourceFileName
   const importedArcs = pack.arcs ?? pack.storyArcs;
   const importedCalendarEvents = normalizeCalendarEvents(pack);
   const importedRelationships = normalizeRelationshipSeeds(pack);
+  const importedAcademicCourses = normalizePackAcademicCourses(pack);
+  const importedAcademicTests = normalizePackAcademicTests(pack);
+  const importedBulletins = normalizePackBulletins(pack);
   const knownLocationIds = normalizeIdList(pack.knownLocationIds);
   const rumoredLocationIds = normalizeIdList(pack.rumoredLocationIds);
   const meta = packMeta(pack, sourceFileName);
   const summary = summarizeWorldPack(pack, sourceFileName);
+  if (summary.errorCount) throw new Error(worldPackErrorMessage(summary));
   const existingPackMeta = state.world?.packMeta || [];
   const packMetaKey = meta.id || meta.sourceFileName || meta.name;
   const nextPackMeta = [
@@ -444,9 +659,21 @@ export function applyWorldPack(state: GameState, pack: WorldPack, sourceFileName
         ...(state.world?.npcSchedules || {}),
         ...(pack.npcSchedules || {}),
       },
+      academicCourses: mergeRecords(state.world?.academicCourses, importedAcademicCourses),
+      courses: mergeRecords(state.world?.courses, importedAcademicCourses),
+      academicTests: mergeRecords(state.world?.academicTests, importedAcademicTests),
+      tests: mergeRecords(state.world?.tests, importedAcademicTests),
       calendarEvents: [
         ...(state.world?.calendarEvents || []).filter(event => !importedCalendarEvents.some(imported => imported.id === event.id)),
         ...importedCalendarEvents,
+      ],
+      bulletinPosts: [
+        ...normalizeBulletinPosts(state.world?.bulletinPosts).filter(post => !importedBulletins.some(imported => imported.id === post.id)),
+        ...importedBulletins,
+      ],
+      bulletins: [
+        ...normalizeBulletinPosts(state.world?.bulletins).filter(post => !importedBulletins.some(imported => imported.id === post.id)),
+        ...importedBulletins,
       ],
       arcs: importedArcs ?? state.world?.arcs,
       storyArcs: importedArcs ?? state.world?.storyArcs,
@@ -457,8 +684,43 @@ export function applyWorldPack(state: GameState, pack: WorldPack, sourceFileName
   return {
     state: appendEvent(
       nextState,
-      `Imported world pack "${summary.name}" (${summary.npcCount} NPCs, ${summary.locationCount} locations, ${summary.relationshipCount} relationships, ${summary.scheduleCount} schedules, ${summary.eventCount} calendar events, ${summary.arcCount} arcs${summary.warningCount ? `, ${summary.warningCount} warnings` : ""}).`,
+      `Imported world pack "${summary.name}" (${summary.npcCount} NPCs, ${summary.locationCount} locations, ${summary.relationshipCount} relationships, ${summary.courseCount} courses, ${summary.testCount} tests, ${summary.bulletinCount} bulletins, ${summary.scheduleCount} schedules, ${summary.eventCount} calendar events, ${summary.arcCount} arcs${summary.warningCount ? `, ${summary.warningCount} warnings` : ""}).`,
     ),
     summary,
+  };
+}
+
+export function buildWorldPackFromState(state: GameState): WorldPack {
+  const knownLocationIds = Object.entries(state.locationKnowledge || {})
+    .filter(([, record]) => record.state === "known" || record.state === "visited")
+    .map(([locationId]) => locationId);
+  const rumoredLocationIds = Object.entries(state.locationKnowledge || {})
+    .filter(([, record]) => record.state === "rumored")
+    .map(([locationId]) => locationId);
+
+  return {
+    id: `current-world-${state.day}-${state.timeSlot}`,
+    name: "Current World Export",
+    version: "0.1.0",
+    author: "Student Body local export",
+    description: "Exported from the current local game state.",
+    npcs: {
+      ...normalizeNpcMap(state.world?.npcs),
+      ...(state.npcDirectory || {}),
+    },
+    locations: normalizeLocationMap(state.world?.locations),
+    schedules: state.world?.schedules || {},
+    npcSchedules: state.world?.npcSchedules || {},
+    academicCourses: normalizeAcademicCourseMap(state.world?.academicCourses || state.world?.courses || state.world?.classes),
+    academicTests: normalizeAcademicTestMap(state.world?.academicTests || state.world?.tests),
+    calendarEvents: state.world?.calendarEvents || [],
+    bulletinPosts: normalizeBulletinPosts(state.world?.bulletinPosts || state.world?.bulletins),
+    arcs: state.world?.arcs,
+    storyArcs: state.world?.storyArcs,
+    knownNpcIds: state.npcsKnown || [],
+    knownLocationIds,
+    rumoredLocationIds,
+    relationships: state.player.relationships || {},
+    flags: state.flags || {},
   };
 }

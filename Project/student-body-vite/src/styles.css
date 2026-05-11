@@ -2131,7 +2131,7 @@ button {
 
 .state-tool-actions {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 8px;
 }
 
@@ -2152,7 +2152,7 @@ button {
 
 .bundled-pack-picker {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto auto;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
   align-items: end;
   gap: 8px;
 }
@@ -2162,6 +2162,27 @@ button {
   color: #d8cbb3;
   font-size: 12px;
   line-height: 1.35;
+}
+
+.pack-preview {
+  display: grid;
+  gap: 3px;
+  padding: 8px;
+  border: 1px solid rgba(200, 161, 101, 0.24);
+  border-radius: 6px;
+  background: rgba(200, 161, 101, 0.08);
+  color: #e2d7c0;
+  font-size: 12px;
+  line-height: 1.35;
+}
+
+.pack-preview.is-error {
+  border-color: rgba(220, 120, 100, 0.45);
+  background: rgba(220, 120, 100, 0.12);
+}
+
+.pack-preview strong {
+  color: #f0ebdc;
 }
 
 .world-pack-summary {

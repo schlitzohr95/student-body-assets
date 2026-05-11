@@ -53,7 +53,7 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
   let next = state;
   let notification: GameUpdate["notification"];
 
-  if (choice.id.startsWith("bulletin_event_")) {
+  if (choice.id.startsWith("bulletin_event_") || choice.id.startsWith("bulletin_pack_")) {
     const note: GameNote = {
       id: `${state.day}-${state.timeSlot}-${choice.id}`,
       day: state.day,
@@ -250,7 +250,7 @@ function applyActivityOutcome(state: GameState, choice: Choice): GameUpdate {
 }
 
 function getChoiceDurationChunks(choice: Choice) {
-  if (choice.id.startsWith("bulletin_event_")) return 1;
+  if (choice.id.startsWith("bulletin_event_") || choice.id.startsWith("bulletin_pack_")) return 1;
   const durations: Record<string, number> = {
     go_coffee: 2,
     explore: 4,

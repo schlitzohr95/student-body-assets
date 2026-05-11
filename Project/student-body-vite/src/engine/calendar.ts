@@ -1,7 +1,8 @@
-import { BASE_CALENDAR_EVENTS, academicTestCalendarEvents } from "../data/calendar";
+import { BASE_CALENDAR_EVENTS } from "../data/calendar";
 import { DAY_LABELS, LOCATIONS, formatClockTime, normalizeTimeSlot, timeChunk } from "../data/locations";
 import { STARTER_NPCS } from "../data/npcs";
 import type { CalendarEvent, GameState, GameUpdate, LocationDefinition, Npc, NpcId, NpcScheduleBlock } from "../types/game";
+import { getAcademicTests } from "./academics";
 import { normalizeLocationMap, normalizeNpcMap } from "./worldPacks";
 
 const REMINDER_WINDOW_CHUNKS = 16;
@@ -180,10 +181,26 @@ function normalizeWorldCalendarEvents(state: GameState): CalendarEvent[] {
     }));
 }
 
+function academicTestCalendarEvents(state: GameState): CalendarEvent[] {
+  return getAcademicTests(state).map(test => ({
+    id: `test_${test.id}`,
+    title: `${test.courseTitle}: ${test.label}`,
+    kind: "test" as const,
+    day: test.day,
+    startSlot: test.startSlot ?? timeChunk(10),
+    endSlot: test.endSlot ?? timeChunk(11),
+    location: test.location,
+    courseId: test.courseId,
+    testId: test.id,
+    source: "academics",
+    description: "Academic test. Prep affects hints, question count, difficulty, and grade curve.",
+  }));
+}
+
 export function getCalendarEvents(state: GameState): CalendarEvent[] {
   return [
     ...BASE_CALENDAR_EVENTS,
-    ...academicTestCalendarEvents(),
+    ...academicTestCalendarEvents(state),
     ...normalizeWorldCalendarEvents(state),
   ].sort((a, b) => (a.day - b.day) || (a.startSlot - b.startSlot) || a.title.localeCompare(b.title));
 }

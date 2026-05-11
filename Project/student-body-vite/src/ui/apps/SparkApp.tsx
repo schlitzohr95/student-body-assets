@@ -1,8 +1,9 @@
 import { useMemo, useState } from "react";
-import { ACADEMIC_COURSES, ACADEMIC_TESTS } from "../../data/academics";
 import { getLocationDirectory } from "../../engine/calendar";
 import {
   calculateAcademicDifficulty,
+  getAcademicCourses,
+  getAcademicTests,
   getCompletedTest,
   getCourseRecord,
   getCourseTests,
@@ -149,13 +150,15 @@ function QuestionInput({
 }
 
 export function SparkApp({ state, onSubmitTest }: SparkAppProps) {
+  const tests = useMemo(() => getAcademicTests(state), [state]);
+  const courses = useMemo(() => getAcademicCourses(state), [state]);
   const nextTest = getNextAcademicTest(state);
   const [mode, setMode] = useState<"tests" | "courses">("tests");
-  const [selectedTestId, setSelectedTestId] = useState(nextTest?.id || ACADEMIC_TESTS[0]?.id || "");
-  const [selectedCourseId, setSelectedCourseId] = useState(ACADEMIC_COURSES[0]?.id || "");
+  const [selectedTestId, setSelectedTestId] = useState(nextTest?.id || tests[0]?.id || "");
+  const [selectedCourseId, setSelectedCourseId] = useState(courses[0]?.id || "");
   const selectedTest = useMemo(
-    () => ACADEMIC_TESTS.find(test => test.id === selectedTestId) || nextTest || ACADEMIC_TESTS[0],
-    [nextTest, selectedTestId],
+    () => tests.find(test => test.id === selectedTestId) || nextTest || tests[0],
+    [nextTest, selectedTestId, tests],
   );
   const [answers, setAnswers] = useState<Record<string, AcademicAnswerValue>>({});
   const [lastResult, setLastResult] = useState<AcademicTestResult | null>(null);
@@ -191,7 +194,7 @@ export function SparkApp({ state, onSubmitTest }: SparkAppProps) {
   }
 
   const resultToShow = lastResult || completed;
-  const selectedCourse = ACADEMIC_COURSES.find(course => course.id === selectedCourseId) || ACADEMIC_COURSES[0];
+  const selectedCourse = courses.find(course => course.id === selectedCourseId) || courses[0];
   const selectedCoursePrep = selectedCourse ? getPrepRecord(state, selectedCourse.id) : null;
   const selectedCourseRecord = selectedCourse ? getCourseRecord(state, selectedCourse.id) : null;
 
@@ -213,7 +216,7 @@ export function SparkApp({ state, onSubmitTest }: SparkAppProps) {
         </div>
 
         <div className="spark-test-list">
-          {mode === "tests" ? ACADEMIC_TESTS.map(test => (
+          {mode === "tests" ? tests.map(test => (
             <button
               className={`spark-test-button ${selectedTest.id === test.id ? "is-selected" : ""}`}
               type="button"
@@ -224,7 +227,7 @@ export function SparkApp({ state, onSubmitTest }: SparkAppProps) {
               <strong>{test.label}</strong>
               <small>{testStatus(state, test)}</small>
             </button>
-          )) : ACADEMIC_COURSES.map(course => {
+          )) : courses.map(course => {
             const record = getCourseRecord(state, course.id);
             return (
               <button
@@ -293,7 +296,7 @@ export function SparkApp({ state, onSubmitTest }: SparkAppProps) {
           </div>
 
           <div className="spark-question-list">
-            {getCourseTests(selectedCourse.id).map(test => {
+            {getCourseTests(state, selectedCourse.id).map(test => {
               const record = getCompletedTest(state, test.id);
               const testTiming = getTestTiming(state, test);
               return (

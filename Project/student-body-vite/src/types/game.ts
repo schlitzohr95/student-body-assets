@@ -250,6 +250,17 @@ export interface CalendarEvent {
   source?: string;
 }
 
+export interface BulletinPostDefinition {
+  id: string;
+  kicker?: string;
+  title: string;
+  body: string;
+  day?: number;
+  slot?: TimeSlotIndex;
+  action?: Choice;
+  source?: string;
+}
+
 export interface CalendarState {
   seenReminderIds: string[];
 }
@@ -345,10 +356,17 @@ export interface WorldPack {
   places?: LocationDefinition[] | Record<LocationId, LocationDefinition>;
   schedules?: Record<string, unknown>;
   npcSchedules?: Record<NpcId, unknown>;
+  academicCourses?: AcademicCourseDefinition[] | Record<string, AcademicCourseDefinition>;
+  courses?: AcademicCourseDefinition[] | Record<string, AcademicCourseDefinition>;
+  classes?: AcademicCourseDefinition[] | Record<string, AcademicCourseDefinition>;
+  academicTests?: AcademicTestDefinition[] | Record<string, AcademicTestDefinition>;
+  tests?: AcademicTestDefinition[] | Record<string, AcademicTestDefinition>;
   calendarEvents?: CalendarEvent[];
   calendar?: CalendarEvent[] | { events?: CalendarEvent[] };
   events?: CalendarEvent[];
   deadlines?: CalendarEvent[];
+  bulletinPosts?: BulletinPostDefinition[] | Record<string, BulletinPostDefinition>;
+  bulletins?: BulletinPostDefinition[] | Record<string, BulletinPostDefinition>;
   arcs?: unknown;
   storyArcs?: unknown;
   knownNpcIds?: NpcId[];
@@ -366,7 +384,14 @@ export interface GameWorldState {
   locations?: LocationDefinition[] | Record<LocationId, LocationDefinition>;
   schedules?: Record<string, unknown>;
   npcSchedules?: Record<NpcId, unknown>;
+  academicCourses?: AcademicCourseDefinition[] | Record<string, AcademicCourseDefinition>;
+  courses?: AcademicCourseDefinition[] | Record<string, AcademicCourseDefinition>;
+  classes?: AcademicCourseDefinition[] | Record<string, AcademicCourseDefinition>;
+  academicTests?: AcademicTestDefinition[] | Record<string, AcademicTestDefinition>;
+  tests?: AcademicTestDefinition[] | Record<string, AcademicTestDefinition>;
   calendarEvents?: CalendarEvent[];
+  bulletinPosts?: BulletinPostDefinition[] | Record<string, BulletinPostDefinition>;
+  bulletins?: BulletinPostDefinition[] | Record<string, BulletinPostDefinition>;
   arcs?: unknown;
   storyArcs?: unknown;
   packMeta?: WorldPackMeta[];

@@ -20,8 +20,10 @@ Beacon's State tab is the current dev surface for save/load/export work.
 
 Beacon supports two world-pack loading paths:
 
-- `Load Pack` imports an authored JSON pack from `public/world-packs/manifest.json`
-- `Import World Pack` imports a local JSON file with the same pack shape
+- `Preview` reads an authored JSON pack from `public/world-packs/manifest.json`, validates it, and stages it for import
+- `Preview World Pack` reads a local JSON file with the same pack shape
+- `Import Preview` applies the staged pack if it has no blocking errors
+- `Export World Pack` exports the currently imported/authored world content from the running save
 
 The bundled manifest shape is:
 
@@ -46,6 +48,15 @@ The bundled manifest shape is:
       "npcCount": 3,
       "locationCount": 3,
       "tags": ["town", "discovery", "relationships", "calendar"]
+    },
+    {
+      "id": "arts-and-activism",
+      "name": "Arts And Activism",
+      "description": "Adds studio spaces, organizers, an arts course, a test, and bulletin posts.",
+      "path": "/world-packs/arts-and-activism.json",
+      "npcCount": 2,
+      "locationCount": 2,
+      "tags": ["arts", "activism", "classes", "bulletins"]
     }
   ]
 }
@@ -76,6 +87,51 @@ Each pack file accepts a loose authored shape. Supported top-level keys:
     }
   },
   "schedules": {},
+  "academicCourses": {
+    "debate101": {
+      "id": "debate101",
+      "code": "DBT 101",
+      "title": "Public Argument",
+      "instructor": "Avery Chen",
+      "location": "debate_room",
+      "meetingDays": [2, 4, 9, 11],
+      "summary": "How claims, evidence, timing, and audience shape campus arguments.",
+      "stakes": "Strong work can unlock club leads and social confidence."
+    }
+  },
+  "academicTests": {
+    "debate101_claims": {
+      "id": "debate101_claims",
+      "courseId": "debate101",
+      "courseTitle": "Public Argument",
+      "label": "Claims Check",
+      "day": 10,
+      "startSlot": 56,
+      "location": "debate_room",
+      "baseDifficulty": 6,
+      "questions": [
+        {
+          "id": "evidence",
+          "type": "multiple_choice",
+          "prompt": "Which answer supports a claim with evidence?",
+          "options": [
+            { "id": "source", "label": "A specific source and reason", "correct": true },
+            { "id": "vibe", "label": "A confident vibe" }
+          ],
+          "explanation": "Evidence needs something inspectable."
+        }
+      ]
+    }
+  },
+  "bulletinPosts": [
+    {
+      "id": "debate-table",
+      "kicker": "Club",
+      "title": "Debate table needs first-years",
+      "body": "Bring one claim you can actually defend.",
+      "action": { "id": "bulletin_pack_debate_table", "label": "Pin debate table" }
+    }
+  ],
   "knownNpcIds": ["debate_captain"],
   "knownLocationIds": ["debate_room"],
   "rumoredLocationIds": ["late_bus_stop"],
@@ -108,6 +164,9 @@ Aliases are accepted for authoring convenience:
 - `npcSchedules` can sit beside `schedules`
 - `storyArcs` can stand in for `arcs`
 - `initialRelationships` can stand in for `relationships`
+- `courses` or `classes` can stand in for `academicCourses`
+- `tests` can stand in for `academicTests`
+- `bulletins` can stand in for `bulletinPosts`
 
 Imported NPCs are merged into `state.npcDirectory`, imported locations are stored in `state.world.locations`, and Compass plus narrator context can read the added locations immediately.
 
@@ -117,4 +176,8 @@ Imported NPCs are merged into `state.npcDirectory`, imported locations are store
 
 Beacon validates packs during import and reports warnings for common authoring mistakes, such as schedule blocks pointing at missing locations, calendar events missing required fields, NPCs without schemas, or relationship seeds for unknown NPC ids. Warnings do not block import; they are meant to keep authored packs debuggable.
 
-The bundled examples live in `public/world-packs/`. `campus-life-starter.json` stays compact enough to inspect by hand, while `town-side-rumors.json` exercises discovery seeds, hidden locations, relationship seeds, schedules, calendar events, and arcs.
+Blocking errors prevent `Import Preview` until fixed. Current blocking errors include an empty/non-importable pack and academic tests with no valid questions.
+
+Imported academic courses and tests appear in Spark and test calendar reminders. Imported bulletin posts appear on the Student Union bulletin board in Compass. Imported relationships appear in Roster after the related NPC is known.
+
+The bundled examples live in `public/world-packs/`. `campus-life-starter.json` stays compact enough to inspect by hand, `town-side-rumors.json` exercises discovery seeds and town NPC schedules, `arts-and-activism.json` exercises creative campus flavor with a course/test/bulletins, and `honors-pressure.json` exercises higher-pressure academic content.

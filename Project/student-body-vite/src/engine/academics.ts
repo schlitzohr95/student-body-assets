@@ -12,6 +12,7 @@ import type {
   GameUpdate,
 } from "../types/game";
 import { appendEvent } from "./state";
+import { normalizeAcademicCourseMap, normalizeAcademicTestMap } from "./worldPacks";
 
 export type AcademicTestTimingStatus = "upcoming" | "starts_now" | "in_progress" | "late";
 
@@ -78,8 +79,25 @@ export function getCourseDefinition(courseId = DEFAULT_COURSE_ID) {
   return ACADEMIC_COURSES.find(course => course.id === courseId) || ACADEMIC_COURSES[0];
 }
 
-export function getCourseTests(courseId = DEFAULT_COURSE_ID) {
-  return ACADEMIC_TESTS.filter(test => test.courseId === courseId);
+export function getAcademicCourses(state?: GameState) {
+  return Object.values({
+    ...Object.fromEntries(ACADEMIC_COURSES.map(course => [course.id, course])),
+    ...normalizeAcademicCourseMap(state?.world?.academicCourses),
+    ...normalizeAcademicCourseMap(state?.world?.courses),
+    ...normalizeAcademicCourseMap(state?.world?.classes),
+  });
+}
+
+export function getAcademicTests(state?: GameState) {
+  return Object.values({
+    ...Object.fromEntries(ACADEMIC_TESTS.map(test => [test.id, test])),
+    ...normalizeAcademicTestMap(state?.world?.academicTests),
+    ...normalizeAcademicTestMap(state?.world?.tests),
+  });
+}
+
+export function getCourseTests(state: GameState, courseId = DEFAULT_COURSE_ID) {
+  return getAcademicTests(state).filter(test => test.courseId === courseId);
 }
 
 export function addAcademicPrep(
@@ -168,9 +186,10 @@ export function testIsAvailable(state: GameState, test: AcademicTestDefinition) 
 }
 
 export function getNextAcademicTest(state: GameState) {
-  return ACADEMIC_TESTS.find(test => !getCompletedTest(state, test.id) && getTestTiming(state, test).status !== "late")
-    || ACADEMIC_TESTS.find(test => !getCompletedTest(state, test.id))
-    || ACADEMIC_TESTS[ACADEMIC_TESTS.length - 1];
+  const tests = getAcademicTests(state);
+  return tests.find(test => !getCompletedTest(state, test.id) && getTestTiming(state, test).status !== "late")
+    || tests.find(test => !getCompletedTest(state, test.id))
+    || tests[tests.length - 1];
 }
 
 export function calculateAcademicDifficulty(state: GameState, test: AcademicTestDefinition): AcademicDifficulty {
@@ -287,7 +306,7 @@ export function submitAcademicTest(
   testId: string,
   selectedAnswers: Record<string, AcademicAnswerValue>,
 ): GameUpdate & { result?: AcademicTestResult } {
-  const test = ACADEMIC_TESTS.find(item => item.id === testId);
+  const test = getAcademicTests(state).find(item => item.id === testId);
   if (!test) return { state };
   const existing = getCompletedTest(state, test.id);
   if (existing) return { state, result: existing };

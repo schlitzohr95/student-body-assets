@@ -8,7 +8,7 @@ import {
 } from "../../narrator/client";
 import { buildNarratorContext } from "../../narrator/context";
 import { BENCH_SCENARIOS, makeBenchResult, type NarratorBenchResult } from "../../narrator/testBench";
-import { normalizeLocationMap, normalizeNpcMap, type WorldPackImportSummary } from "../../engine/worldPacks";
+import { buildWorldPackFromState, normalizeLocationMap, normalizeNpcMap, summarizeWorldPack, worldPackErrorMessage, type WorldPackImportSummary } from "../../engine/worldPacks";
 import { exportJsonFile, readJsonFile } from "../../services/jsonFiles";
 import { fetchWorldPack, fetchWorldPackCatalog, type WorldPackCatalogEntry } from "../../services/worldPackCatalog";
 import type { GameState, NarratorSceneMode, NarratorSettings, WorldPack } from "../../types/game";
@@ -56,6 +56,9 @@ function formatPackSummary(summary: WorldPackImportSummary) {
     `${summary.npcCount} NPCs`,
     `${summary.locationCount} locations`,
     summary.relationshipCount ? `${summary.relationshipCount} relationships` : "",
+    summary.courseCount ? `${summary.courseCount} courses` : "",
+    summary.testCount ? `${summary.testCount} tests` : "",
+    summary.bulletinCount ? `${summary.bulletinCount} bulletins` : "",
     summary.knownLocationCount || summary.rumoredLocationCount ? `${summary.knownLocationCount + summary.rumoredLocationCount} location intel` : "",
     summary.warningCount ? `${summary.warningCount} warnings` : "",
   ].filter(Boolean);
@@ -94,6 +97,7 @@ export function NarratorLabApp({
   const [packCatalogError, setPackCatalogError] = useState<string | null>(null);
   const [hasRequestedPackCatalog, setHasRequestedPackCatalog] = useState(false);
   const [lastPackSummary, setLastPackSummary] = useState<WorldPackImportSummary | null>(null);
+  const [pendingWorldPack, setPendingWorldPack] = useState<{ pack: WorldPack; sourceFileName: string; summary: WorldPackImportSummary } | null>(null);
   const [running, setRunning] = useState(false);
   const saveInputRef = useRef<HTMLInputElement | null>(null);
   const worldPackInputRef = useRef<HTMLInputElement | null>(null);
@@ -294,6 +298,45 @@ export function NarratorLabApp({
     setActiveView("state");
   }
 
+  function exportCurrentWorldPack() {
+    exportJsonFile("student-body-world-pack", {
+      exportKind: "student-body-world-pack",
+      exportedAt: new Date().toISOString(),
+      pack: buildWorldPackFromState(state),
+    });
+    setToolMessage("Current world pack exported.");
+    setActiveView("state");
+  }
+
+  function stageWorldPackPreview(pack: WorldPack, sourceFileName: string) {
+    const summary = summarizeWorldPack(pack, sourceFileName);
+    setPendingWorldPack({ pack, sourceFileName, summary });
+    setLastPackSummary(summary);
+    setGeneratedToolMessage(summary.errorCount
+      ? `Preview blocked. ${worldPackErrorMessage(summary)}`
+      : `Preview ready. ${formatPackSummary(summary)}`);
+  }
+
+  function importPendingWorldPack() {
+    if (!pendingWorldPack) {
+      setGeneratedToolMessage("Preview a world pack before importing.");
+      return;
+    }
+    if (pendingWorldPack.summary.errorCount) {
+      setGeneratedToolMessage(worldPackErrorMessage(pendingWorldPack.summary));
+      return;
+    }
+
+    try {
+      const summary = onImportWorldPack(pendingWorldPack.pack, pendingWorldPack.sourceFileName);
+      setLastPackSummary(summary);
+      setPendingWorldPack(null);
+      setGeneratedToolMessage(`Imported ${formatPackSummary(summary)}`);
+    } catch (caught) {
+      setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
+    }
+  }
+
   async function importSaveFile(file: File) {
     try {
       const payload = await readJsonFile(file);
@@ -310,9 +353,7 @@ export function NarratorLabApp({
     try {
       const pack = await readJsonFile<WorldPack>(file);
       if (!pack || typeof pack !== "object") throw new Error("World pack file did not contain an object.");
-      const summary = onImportWorldPack(pack, file.name);
-      setLastPackSummary(summary);
-      setGeneratedToolMessage(`Imported ${formatPackSummary(summary)}`);
+      stageWorldPackPreview(pack, file.name);
     } catch (caught) {
       setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
     }
@@ -334,7 +375,7 @@ export function NarratorLabApp({
     }
   }
 
-  async function loadBundledWorldPack() {
+  async function previewBundledWorldPack() {
     if (!selectedBundledPack) {
       setGeneratedToolMessage("No bundled world pack is selected.");
       return;
@@ -345,9 +386,7 @@ export function NarratorLabApp({
 
     try {
       const pack = await fetchWorldPack(selectedBundledPack);
-      const summary = onImportWorldPack(pack, selectedBundledPack.path);
-      setLastPackSummary(summary);
-      setGeneratedToolMessage(`Loaded ${formatPackSummary(summary)}`);
+      stageWorldPackPreview(pack, selectedBundledPack.path);
     } catch (caught) {
       setPackCatalogError(caught instanceof Error ? caught.message : String(caught));
       setGeneratedToolMessage(caught instanceof Error ? caught.message : String(caught));
@@ -621,8 +660,11 @@ export function NarratorLabApp({
                 <button className="secondary-button" type="button" onClick={() => saveInputRef.current?.click()}>
                   Import Save JSON
                 </button>
+                <button className="secondary-button" type="button" onClick={exportCurrentWorldPack}>
+                  Export World Pack
+                </button>
                 <button className="secondary-button" type="button" onClick={() => worldPackInputRef.current?.click()}>
-                  Import World Pack
+                  Preview World Pack
                 </button>
               </div>
               {toolMessage && <div className="state-tool-message">{toolMessage}</div>}
@@ -650,11 +692,20 @@ export function NarratorLabApp({
                 <button className="secondary-button" type="button" onClick={refreshPackCatalog} disabled={packCatalogLoading}>
                   Refresh
                 </button>
-                <button className="secondary-button" type="button" onClick={loadBundledWorldPack} disabled={packCatalogLoading || !selectedBundledPack}>
-                  Load Pack
+                <button className="secondary-button" type="button" onClick={previewBundledWorldPack} disabled={packCatalogLoading || !selectedBundledPack}>
+                  Preview
+                </button>
+                <button className="secondary-button" type="button" onClick={importPendingWorldPack} disabled={!pendingWorldPack || pendingWorldPack.summary.errorCount > 0}>
+                  Import Preview
                 </button>
               </div>
               {selectedBundledPack?.description && <p className="pack-description">{selectedBundledPack.description}</p>}
+              {pendingWorldPack && (
+                <div className={pendingWorldPack.summary.errorCount ? "pack-preview is-error" : "pack-preview"}>
+                  <strong>{pendingWorldPack.summary.name}</strong>
+                  <span>{formatPackSummary(pendingWorldPack.summary)}</span>
+                </div>
+              )}
               {packCatalogError && <div className="narrator-error">{packCatalogError}</div>}
               <dl className="world-pack-summary">
                 <div>
@@ -682,6 +733,18 @@ export function NarratorLabApp({
                     <div>
                       <dt>Warnings</dt>
                       <dd>{lastPackSummary.warningCount}</dd>
+                    </div>
+                    <div>
+                      <dt>Courses</dt>
+                      <dd>{lastPackSummary.courseCount}</dd>
+                    </div>
+                    <div>
+                      <dt>Tests</dt>
+                      <dd>{lastPackSummary.testCount}</dd>
+                    </div>
+                    <div>
+                      <dt>Bulletins</dt>
+                      <dd>{lastPackSummary.bulletinCount}</dd>
                     </div>
                   </>
                 )}
